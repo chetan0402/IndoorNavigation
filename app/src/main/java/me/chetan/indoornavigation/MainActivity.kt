@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
                 devices = devices.toMutableMap().apply { this[result.device.address] = result.rssi }
-                // Log.d("BLE", "Device found: ${result.device.address} RSSI: ${result.rssi}")
+                if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE", "Device found: ${result.device.address} RSSI: ${result.rssi}")
             }
             override fun onScanFailed(errorCode: Int) {
                 Log.e("BLE", "Scan failed with error: $errorCode")
@@ -147,8 +147,8 @@ fun BLEContainer(devices: Map<String, Int>) {
         modifier = Modifier.padding(24.dp)
     ) {
         items(devices.toList()) { device ->
-            Text(text = "Address: ${device.first}, RSSI: ${device.second}, Distance: ${calculateDistance(device.second)}",modifier = Modifier.background(
-                color=if (device.first == "A8:A4:B8:87:69:A0") Color(0xFFFF0000) else Color(0xFFFFFFFF)
+            Text(text = "Address: ${device.first}, RSSI: ${device.second}",modifier = Modifier.background(
+                color=if (device.first == "2D:7E:1A:02:3D:21") Color(0xFFFF0000) else Color(0xFFFFFFFF)
             ))
         }
     }
