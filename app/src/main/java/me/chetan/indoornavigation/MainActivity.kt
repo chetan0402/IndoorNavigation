@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -131,8 +133,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun calculateDistance(rssi: Int): Int {
-    return 10.0.pow((-64.0 - rssi) / 20.0).roundToInt()
+fun calculateDistance(rssi: Int): BigDecimal {
+    return 10.0.pow((-34.0012 - rssi) / (10.0*7.3275)).toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
 }
 
 @Preview
@@ -147,7 +149,7 @@ fun BLEContainer(devices: Map<String, Int>) {
         modifier = Modifier.padding(24.dp)
     ) {
         items(devices.toList()) { device ->
-            Text(text = "Address: ${device.first}, RSSI: ${device.second}",modifier = Modifier.background(
+            Text(text = "Address: ${device.first}, RSSI: ${device.second}, Distance: ${calculateDistance(device.second)}",modifier = Modifier.background(
                 color=if (device.first == "2D:7E:1A:02:3D:21") Color(0xFFFF0000) else Color(0xFFFFFFFF)
             ))
         }
