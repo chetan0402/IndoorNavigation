@@ -1,5 +1,6 @@
 package me.chetan.indoornavigation
 
+import Vec2
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
@@ -31,7 +32,6 @@ import androidx.core.app.ActivityCompat
 import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.math.pow
-import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     private var devices by mutableStateOf(mapOf<String, Int>())
@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             BLEContainer(devices)
+            DistanceContainer(devices)
         }
     }
 
@@ -112,7 +113,7 @@ class MainActivity : ComponentActivity() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
                 devices = devices.toMutableMap().apply { this[result.device.address] = result.rssi }
-                if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE", "Device found: ${result.device.address} RSSI: ${result.rssi}")
+                // if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE", "Device found: ${result.device.address} RSSI: ${result.rssi}")
             }
             override fun onScanFailed(errorCode: Int) {
                 Log.e("BLE", "Scan failed with error: $errorCode")
@@ -153,5 +154,24 @@ fun BLEContainer(devices: Map<String, Int>) {
                 color=if (device.first == "2D:7E:1A:02:3D:21") Color(0xFFFF0000) else Color(0xFFFFFFFF)
             ))
         }
+    }
+}
+
+val BLE1="2D:7E:1A:02:3D:21"
+val BLE2=""
+
+@Composable
+fun DistanceContainer(devices:Map<String,Int>){
+    if(devices.containsKey(BLE1) and devices.containsKey(BLE2)) {
+        Text(
+            text = "Distance from BLE A: ${
+                LineConstrainedTrilateration.estimate(
+                    Vec2(0.0, 0.0),
+                    Vec2(450.0, 0.0),
+                    calculateDistance(devices[BLE1]!!),
+                    calculateDistance(devices[BLE2]!!)
+                )
+            }"
+        )
     }
 }
