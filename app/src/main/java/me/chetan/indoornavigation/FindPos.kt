@@ -14,7 +14,7 @@ object LineConstrainedTrilateration {
         require(D > 1e-9) { "Anchors must not be coincident" }
 
         // Closed-form least-squares solution
-        val tStar = (d1 - d2 + D) / (2.0 * D)
+        val tStar = (d1.toDouble() - d2.toDouble() + D) / (2.0 * D)
 
         // Clamp to line segment
         val t = min(1.0, max(0.0, tStar))

@@ -16,14 +16,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,10 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Instant
 import kotlin.math.pow
 
 class MainActivity : ComponentActivity() {
-    private var devices by mutableStateOf(mapOf<String, Int>())
+    private var devices = mutableStateMapOf<String, Int>()
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
 
@@ -68,9 +76,6 @@ class MainActivity : ComponentActivity() {
         val adapter = bluetoothManager.adapter
         if (adapter == null || !adapter.isEnabled) {
             Log.e("BLE", "Bluetooth not supported or not enabled")
-            setContent {
-                BLEContainer(devices)
-            }
             return
         }
 
@@ -97,8 +102,10 @@ class MainActivity : ComponentActivity() {
         startBleScan()
 
         setContent {
-            BLEContainer(devices)
-            DistanceContainer(devices)
+            Column {
+                DistanceContainer(devices)
+                BLEContainer(devices)
+            }
         }
     }
 
@@ -112,7 +119,7 @@ class MainActivity : ComponentActivity() {
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
-                devices = devices.toMutableMap().apply { this[result.device.address] = result.rssi }
+                devices[result.device.address] = result.rssi
                 // if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE", "Device found: ${result.device.address} RSSI: ${result.rssi}")
             }
             override fun onScanFailed(errorCode: Int) {
@@ -151,27 +158,36 @@ fun BLEContainer(devices: Map<String, Int>) {
     ) {
         items(devices.toList()) { device ->
             Text(text = "Address: ${device.first}, RSSI: ${device.second}, Distance: ${calculateDistance(device.second)}",modifier = Modifier.background(
-                color=if (device.first == "2D:7E:1A:02:3D:21") Color(0xFFFF0000) else Color(0xFFFFFFFF)
+                color=if (device.first == "2D:7E:1A:02:3D:21" || device.first == "55:6D:EA:22:2C:71") Color(0xFFFF0000) else Color(0xFFFFFFFF)
             ))
         }
     }
 }
 
 val BLE1="2D:7E:1A:02:3D:21"
-val BLE2=""
+val BLE2="55:6D:EA:22:2C:71"
 
 @Composable
-fun DistanceContainer(devices:Map<String,Int>){
-    if(devices.containsKey(BLE1) and devices.containsKey(BLE2)) {
-        Text(
-            text = "Distance from BLE A: ${
-                LineConstrainedTrilateration.estimate(
-                    Vec2(0.0, 0.0),
-                    Vec2(450.0, 0.0),
-                    calculateDistance(devices[BLE1]!!),
-                    calculateDistance(devices[BLE2]!!)
-                )
-            }"
-        )
+fun DistanceContainer(devices: SnapshotStateMap<String,Int>){
+    Box(modifier = Modifier.padding(24.dp)) {
+        val rssi1 by remember {
+            derivedStateOf { devices[BLE1] }
+        }
+
+        val rssi2 by remember {
+            derivedStateOf { devices[BLE2] }
+        }
+        if (rssi1!=null && rssi2!=null) {
+            Text(
+                text = "Distance from BLE A: ${
+                    LineConstrainedTrilateration.estimate(
+                        Vec2(0.0, 0.0),
+                        Vec2(4.5, 0.0),
+                        calculateDistance(rssi1!!),
+                        calculateDistance(rssi2!!)
+                    ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
+                }"
+            )
+        }
     }
 }
