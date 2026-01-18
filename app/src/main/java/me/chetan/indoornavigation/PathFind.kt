@@ -10,8 +10,8 @@ class PathFind(val graph: Map<String,List<GeoLocation>>) {
         return listOf()
     }
 
-    fun pos(device: String): GeoLocation{
-        return GeoLocation(0.0,0.0,0.0) // TODO: get pos of each device based on their device ID
+    fun pos(device: String): GeoLocation?{
+        return null // TODO: get pos of each device based on their device ID
     }
 
     fun loc(devices: Map<String, Double>): GeoLocation{
@@ -19,7 +19,7 @@ class PathFind(val graph: Map<String,List<GeoLocation>>) {
         val distances = mutableListOf<Double>()
 
         for (device in devices){
-            anchors.add(pos(device.key))
+            pos(device.key)?.let { anchors.add(it) }
             distances.add(device.value)
         }
 
