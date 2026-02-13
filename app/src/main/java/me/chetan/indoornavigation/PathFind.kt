@@ -11,7 +11,10 @@ class PathFind(val graph: Map<String,List<GeoLocation>>) {
     }
 
     fun pos(device: String): GeoLocation?{
-        return null // TODO: get pos of each device based on their device ID
+        return mapOf(
+            "2D:7E:1A:02:3D:21" to GeoLocation(0.0,0.0,0.0),
+            "55:6D:EA:22:2C:71" to GeoLocation(0.0,0.0,0.0)
+        )[device] // TODO: get pos of each device based on their device ID
     }
 
     fun loc(devices: Map<String, Double>): GeoLocation{

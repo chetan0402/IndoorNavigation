@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
                 devices[result.device.address] = result.rssi
-                // if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE", "Device found: ${result.device.address} RSSI: ${result.rssi}")
+                if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLEREAD", "Device found: ${result.device.address} RSSI: ${result.rssi}")
             }
             override fun onScanFailed(errorCode: Int) {
                 Log.e("BLE", "Scan failed with error: $errorCode")
@@ -177,7 +177,7 @@ fun DistanceContainer(devices: SnapshotStateMap<String,Int>){
                 text = "Distance from BLE A: ${
                     LineConstrainedTrilateration.estimate(
                         Vec2(0.0, 0.0),
-                        Vec2(4.5, 0.0),
+                        Vec2(15.0, 0.0),
                         calculateDistance(rssi1!!),
                         calculateDistance(rssi2!!)
                     ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)

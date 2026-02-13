@@ -1,0 +1,25 @@
+2026-02-06 10:54:55.368  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -79
+2026-02-06 10:54:55.578  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -80
+2026-02-06 10:54:55.796  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -80
+2026-02-06 10:54:57.060  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -78
+2026-02-06 10:54:57.272  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -82
+2026-02-06 10:54:57.483  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -77
+2026-02-06 10:55:00.272  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -79
+2026-02-06 10:55:00.903  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -76
+2026-02-06 10:55:02.678  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -88
+2026-02-06 10:55:02.883  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -73
+2026-02-06 10:55:04.868  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -79
+2026-02-06 10:55:05.294  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -77
+2026-02-06 10:55:05.501  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -77
+2026-02-06 10:55:06.462  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -76
+2026-02-06 10:55:07.094  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -78
+2026-02-06 10:55:09.109  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -75
+2026-02-06 10:55:10.266  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -79
+2026-02-06 10:55:10.475  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -76
+2026-02-06 10:55:12.693  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -77
+2026-02-06 10:55:12.902  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -76
+2026-02-06 10:55:14.467  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -73
+2026-02-06 10:55:14.888  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -79
+2026-02-06 10:55:15.304  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -79
+2026-02-06 10:55:16.870  1618-1618  BLEREAD                 me.chetan.indoornavigation           D  Device found: 2D:7E:1A:02:3D:21 RSSI: -78
+
