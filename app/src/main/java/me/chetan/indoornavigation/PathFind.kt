@@ -1,11 +1,29 @@
 package me.chetan.indoornavigation
 
+import android.content.Context
+import android.util.Log
+import org.jpmml.evaluator.Evaluator
+import org.jpmml.evaluator.LoadingModelEvaluatorBuilder
+import java.math.BigDecimal
 import kotlin.math.abs
 import kotlin.math.sqrt
 
 data class GeoLocation(var long: Double, var lat: Double, var alt: Double, val name: String = "")
 
 class PathFind(val graph: Map<String,List<GeoLocation>>) {
+    lateinit var model: Evaluator
+    constructor(context: Context, graph: Map<String,List<GeoLocation>>) : this(graph) {
+        this.model = context.assets.open("model.pmml").use { inputStream ->
+            LoadingModelEvaluatorBuilder().load(inputStream).build()
+        }
+        Log.e("SUMMARY",this.model.summary)
+        Log.e("INPUTFIELDS", this.model.inputFields.toString())
+    }
+
+    fun calculateDistance(rssi: BigDecimal): BigDecimal{
+        return 0.toBigDecimal()
+    }
+
     fun route(start: GeoLocation,goal: GeoLocation): List<GeoLocation> {
         return listOf()
     }

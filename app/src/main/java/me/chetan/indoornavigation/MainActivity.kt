@@ -15,26 +15,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
-import java.math.BigDecimal
-import java.math.RoundingMode
-import kotlin.math.pow
 
 class MainActivity : ComponentActivity() {
     private var devices = mutableStateMapOf<String, Int>()
@@ -98,8 +89,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Column {
-                DistanceContainer(devices)
-                BLEContainer(devices)
+                // DistanceContainer(devices)
+                BLEContainer(devices,PathFind(baseContext,mapOf()))
             }
         }
     }
@@ -136,23 +127,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-fun calculateDistance(rssi: Int): BigDecimal {
-    return 10.0.pow((-34.0012 - rssi) / (10.0*7.3275)).toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
-}
-
-@Preview
-@Composable
-fun BLEContainerPreview() {
-    BLEContainer(devices = emptyMap())
-}
+//@Preview
+//@Composable
+//fun BLEContainerPreview() {
+//    BLEContainer(devices = emptyMap())
+//}
 
 @Composable
-fun BLEContainer(devices: Map<String, Int>) {
+fun BLEContainer(devices: Map<String, Int>,pathFind: PathFind) {
     LazyColumn (
         modifier = Modifier.padding(24.dp)
     ) {
         items(devices.toList()) { device ->
-            Text(text = "Address: ${device.first}, RSSI: ${device.second}, Distance: ${calculateDistance(device.second)}",modifier = Modifier.background(
+            Text(text = "Address: ${device.first}, RSSI: ${device.second}, Distance: ${pathFind.calculateDistance(device.second.toBigDecimal())}",modifier = Modifier.background(
                 color=if (device.first == "2D:7E:1A:02:3D:21" || device.first == "55:6D:EA:22:2C:71") Color(0xFFFF0000) else Color(0xFFFFFFFF)
             ))
         }
@@ -162,27 +149,27 @@ fun BLEContainer(devices: Map<String, Int>) {
 const val BLE1="2D:7E:1A:02:3D:21"
 const val BLE2="55:6D:EA:22:2C:71"
 
-@Composable
-fun DistanceContainer(devices: SnapshotStateMap<String,Int>){
-    Box(modifier = Modifier.padding(24.dp)) {
-        val rssi1 by remember {
-            derivedStateOf { devices[BLE1] }
-        }
-
-        val rssi2 by remember {
-            derivedStateOf { devices[BLE2] }
-        }
-        if (rssi1!=null && rssi2!=null) {
-            Text(
-                text = "Distance from BLE A: ${
-                    LineConstrainedTrilateration.estimate(
-                        Vec2(0.0, 0.0),
-                        Vec2(15.0, 0.0),
-                        calculateDistance(rssi1!!),
-                        calculateDistance(rssi2!!)
-                    ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
-                }"
-            )
-        }
-    }
-}
+//@Composable
+//fun DistanceContainer(devices: SnapshotStateMap<String,Int>){
+//    Box(modifier = Modifier.padding(24.dp)) {
+//        val rssi1 by remember {
+//            derivedStateOf { devices[BLE1] }
+//        }
+//
+//        val rssi2 by remember {
+//            derivedStateOf { devices[BLE2] }
+//        }
+//        if (rssi1!=null && rssi2!=null) {
+//            Text(
+//                text = "Distance from BLE A: ${
+//                    LineConstrainedTrilateration.estimate(
+//                        Vec2(0.0, 0.0),
+//                        Vec2(15.0, 0.0),
+//                        calculateDistance(rssi1!!),
+//                        calculateDistance(rssi2!!)
+//                    ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
+//                }"
+//            )
+//        }
+//    }
+//}
