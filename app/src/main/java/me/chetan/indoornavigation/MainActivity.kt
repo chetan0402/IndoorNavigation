@@ -1,5 +1,6 @@
 package me.chetan.indoornavigation
 
+import Model
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
@@ -14,7 +15,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,13 +22,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 
 class MainActivity : ComponentActivity() {
-    private var devices = mutableStateMapOf<String, Int>()
+    private var devices = mutableStateMapOf<String, MutableList<Double>>()
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
 
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             Column {
                 // DistanceContainer(devices)
-                BLEContainer(devices,PathFind(baseContext,mapOf()))
+                BLEContainer(devices)
             }
         }
     }
@@ -105,8 +105,19 @@ class MainActivity : ComponentActivity() {
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
-                devices[result.device.address] = result.rssi
-                if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLEREAD", "Device found: ${result.device.address} RSSI: ${result.rssi}")
+                devices[result.device.address]?.add(result.rssi.toDouble())
+                devices[result.device.address]?.let {
+                    it.sort()
+                    if(it.size > 5){
+                        val avg= it.average()
+                        if(it[0]-avg > it[it.size-1]-avg){
+                            it.remove(it[0])
+                        }else{
+                            it.remove(it[it.size-1])
+                        }
+                    }
+                }
+                //if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLEREAD", "Device found: ${result.device.address} RSSI: ${result.rssi}")
             }
             override fun onScanFailed(errorCode: Int) {
                 Log.e("BLE", "Scan failed with error: $errorCode")
@@ -133,21 +144,21 @@ class MainActivity : ComponentActivity() {
 //    BLEContainer(devices = emptyMap())
 //}
 
+const val BLE1="2D:7E:1A:02:3D:21"
+const val BLE2="55:6D:EA:22:2C:71"
+
 @Composable
-fun BLEContainer(devices: Map<String, Int>,pathFind: PathFind) {
+fun BLEContainer(devices: SnapshotStateMap<String, MutableList<Double>>) {
     LazyColumn (
         modifier = Modifier.padding(24.dp)
     ) {
         items(devices.toList()) { device ->
-            Text(text = "Address: ${device.first}, RSSI: ${device.second}, Distance: ${pathFind.calculateDistance(device.second.toBigDecimal())}",modifier = Modifier.background(
-                color=if (device.first == "2D:7E:1A:02:3D:21" || device.first == "55:6D:EA:22:2C:71") Color(0xFFFF0000) else Color(0xFFFFFFFF)
-            ))
+            if(device.first == BLE1 || device.first == BLE2){
+                Text(text="RSSI: ${device.second}, Distance: ${Model.score(device.second.toDoubleArray())}")
+            }
         }
     }
 }
-
-const val BLE1="2D:7E:1A:02:3D:21"
-const val BLE2="55:6D:EA:22:2C:71"
 
 //@Composable
 //fun DistanceContainer(devices: SnapshotStateMap<String,Int>){
