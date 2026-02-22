@@ -44,7 +44,7 @@ class PathFind(val graph: Map<String,List<GeoLocation>>) {
         var y = anchors.map { it.lat }.average()
         var z = anchors.map { it.alt }.average()
 
-        var lambda = 1e-3
+        val lambda = 1e-3
 
         repeat(iterations) {
 

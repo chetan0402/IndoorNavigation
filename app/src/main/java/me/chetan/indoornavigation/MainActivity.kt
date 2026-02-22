@@ -1,6 +1,5 @@
 package me.chetan.indoornavigation
 
-import Model
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
@@ -15,6 +14,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,9 +26,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import java.math.RoundingMode
 
 class MainActivity : ComponentActivity() {
-    private var devices = mutableStateMapOf<String, MutableList<Double>>()
+    private var devices = mutableStateMapOf<String, Pair<Double, RSSIDistancePredictor>>()
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
 
@@ -89,7 +90,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Column {
-                // DistanceContainer(devices)
+                TrilaterateContainer(devices)
+                DistanceContainer(devices)
                 BLEContainer(devices)
             }
         }
@@ -105,19 +107,17 @@ class MainActivity : ComponentActivity() {
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
-                devices[result.device.address]?.add(result.rssi.toDouble())
-                devices[result.device.address]?.let {
-                    it.sort()
-                    if(it.size > 5){
-                        val avg= it.average()
-                        if(it[0]-avg > it[it.size-1]-avg){
-                            it.remove(it[0])
-                        }else{
-                            it.remove(it[it.size-1])
-                        }
-                    }
+                if(result.device.address != BLE1 && result.device.address != BLE2 && result.device.address != BLE3) return
+                if (devices[result.device.address] == null) {
+                    devices[result.device.address]= 0.0 to RSSIDistancePredictor()
                 }
-                //if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLEREAD", "Device found: ${result.device.address} RSSI: ${result.rssi}")
+                devices[result.device.address]?.let {
+                    val predictor = it.second
+                    val (dis, _) = predictor.predict(result.rssi.toDouble())
+                    devices[result.device.address] = dis to predictor
+                }
+
+                //if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE_READ", "Device found: ${result.device.address} RSSI: ${result.rssi}")
             }
             override fun onScanFailed(errorCode: Int) {
                 Log.e("BLE", "Scan failed with error: $errorCode")
@@ -146,41 +146,60 @@ class MainActivity : ComponentActivity() {
 
 const val BLE1="2D:7E:1A:02:3D:21"
 const val BLE2="55:6D:EA:22:2C:71"
+const val BLE3="68:1A:9E:8C:E2:CB"
 
 @Composable
-fun BLEContainer(devices: SnapshotStateMap<String, MutableList<Double>>) {
+fun BLEContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>) {
     LazyColumn (
         modifier = Modifier.padding(24.dp)
     ) {
-        items(devices.toList()) { device ->
-            if(device.first == BLE1 || device.first == BLE2){
-                Text(text="RSSI: ${device.second}, Distance: ${Model.score(device.second.toDoubleArray())}")
-            }
+        items(devices.entries.toList()) { (address, pair) ->
+            Text(text = "Address: $address Distance: ${pair.first}")
         }
     }
 }
 
-//@Composable
-//fun DistanceContainer(devices: SnapshotStateMap<String,Int>){
-//    Box(modifier = Modifier.padding(24.dp)) {
-//        val rssi1 by remember {
-//            derivedStateOf { devices[BLE1] }
-//        }
-//
-//        val rssi2 by remember {
-//            derivedStateOf { devices[BLE2] }
-//        }
-//        if (rssi1!=null && rssi2!=null) {
-//            Text(
-//                text = "Distance from BLE A: ${
-//                    LineConstrainedTrilateration.estimate(
-//                        Vec2(0.0, 0.0),
-//                        Vec2(15.0, 0.0),
-//                        calculateDistance(rssi1!!),
-//                        calculateDistance(rssi2!!)
-//                    ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
-//                }"
-//            )
-//        }
-//    }
-//}
+@Composable
+fun DistanceContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>){
+    Box(modifier = Modifier.padding(24.dp)) {
+        val dis1=devices[BLE1]
+        val dis2=devices[BLE2]
+        if (dis1!=null && dis2!=null) {
+            Text(
+                text = "Distance from BLE A: ${
+                    LineConstrainedTrilateration.estimate(
+                        Vec2(0.0, 0.0),
+                        Vec2(10.44, 0.0),
+                        dis1.first.toBigDecimal(),
+                        dis2.first.toBigDecimal()
+                    ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
+                }"
+            )
+        }
+    }
+}
+
+@Composable
+fun TrilaterateContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>){
+    Box(modifier=Modifier.padding(24.dp)){
+        val dis1=devices[BLE1]
+        val dis2=devices[BLE2]
+        val dis3=devices[BLE3]
+        if (dis1!=null && dis2!=null && dis3!=null){
+            Text(
+                text = "${PathFind(emptyMap()).trilaterate(
+                    listOf(
+                        GeoLocation(0.0,0.0,0.0,"BLE1"),
+                        GeoLocation(10.0,0.0,0.0,"BLE2"),
+                        GeoLocation(0.0,11.0,0.0,"BLE3")
+                    ),
+                    listOf(
+                        dis1.first,
+                        dis2.first,
+                        dis3.first
+                    )
+                )}"
+            )
+        }
+    }
+}
