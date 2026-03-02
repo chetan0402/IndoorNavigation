@@ -1,13 +1,86 @@
 package me.chetan.indoornavigation
 
+import java.util.PriorityQueue
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-data class GeoLocation(var long: Double, var lat: Double, var alt: Double, val name: String = "")
+data class GeoLocation(val long: Double, val lat: Double, val alt: Double, val name: String = "") {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
-class PathFind(val graph: Map<String,List<GeoLocation>>) {
+        other as GeoLocation
+
+        if (long != other.long) return false
+        if (lat != other.lat) return false
+        if (alt != other.alt) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = long.hashCode()
+        result = 31 * result + lat.hashCode()
+        result = 31 * result + alt.hashCode()
+        return result
+    }
+}
+
+class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
+    fun insertPointInGraph(mutGraph: MutableMap<GeoLocation, MutableList<GeoLocation>>, point: GeoLocation){
+        var minDis= Double.MAX_VALUE
+        var edgeStart: GeoLocation? = null
+        var edgeEnd: GeoLocation? = null
+        mutGraph.forEach { (u, adj) ->
+            adj.forEach { v ->
+                val dis=distance_from_line(point,u,v)
+                if(dis<minDis){
+                    minDis=dis
+                    edgeStart=u
+                    edgeEnd=v
+                }
+            }
+        }
+
+        if(edgeStart==null || edgeEnd==null){
+            return
+        }
+
+        val pointToInsert = interpolate_onto_line(point, edgeStart, edgeEnd) ?: return
+
+        if(pointToInsert==edgeStart || pointToInsert==edgeEnd){
+            return
+        }
+
+        mutGraph[pointToInsert]= mutableListOf(edgeStart,edgeEnd)
+
+        mutGraph[edgeStart]?.remove(edgeEnd)
+        mutGraph[edgeEnd]?.remove(edgeStart)
+
+        mutGraph[edgeStart]?.add(pointToInsert)
+        mutGraph[edgeEnd]?.add(pointToInsert)
+    }
 
     fun route(start: GeoLocation,goal: GeoLocation): List<GeoLocation> {
+        val mutGraph = graph.toMutableMap()
+        insertPointInGraph(mutGraph,start)
+        insertPointInGraph(mutGraph,goal)
+
+        val minQ = PriorityQueue<Pair<Double, List<GeoLocation>>>()
+        minQ.add(0.0 to listOf(start))
+        while(minQ.isNotEmpty()){
+            val (dis, curRoute)=minQ.poll()!!
+            if(curRoute.last()==goal) {
+                return curRoute
+            }
+
+            mutGraph[curRoute.last()]?.forEach {
+                val mutList=curRoute.toMutableList()
+                mutList.add(it)
+                minQ.add((dis+distance_between_point(curRoute.last(),it)) to mutList.toList())
+            }
+        }
+
         return listOf()
     }
 
@@ -16,18 +89,6 @@ class PathFind(val graph: Map<String,List<GeoLocation>>) {
             "2D:7E:1A:02:3D:21" to GeoLocation(0.0,0.0,0.0),
             "55:6D:EA:22:2C:71" to GeoLocation(0.0,0.0,0.0)
         )[device] // TODO: get pos of each device based on their device ID
-    }
-
-    fun loc(devices: Map<String, Double>): GeoLocation{
-        val anchors = mutableListOf<GeoLocation>()
-        val distances = mutableListOf<Double>()
-
-        for (device in devices){
-            pos(device.key)?.let { anchors.add(it) }
-            distances.add(device.value)
-        }
-
-        return trilaterate(anchors,distances)
     }
 
     fun trilaterate(

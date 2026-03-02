@@ -26,7 +26,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
-import java.math.RoundingMode
 
 class MainActivity : ComponentActivity() {
     private var devices = mutableStateMapOf<String, Pair<Double, RSSIDistancePredictor>>()
@@ -91,7 +90,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             Column {
                 TrilaterateContainer(devices)
-                DistanceContainer(devices)
                 BLEContainer(devices)
             }
         }
@@ -150,31 +148,11 @@ const val BLE3="68:1A:9E:8C:E2:CB"
 
 @Composable
 fun BLEContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>) {
-    LazyColumn (
+    LazyColumn(
         modifier = Modifier.padding(24.dp)
     ) {
         items(devices.entries.toList()) { (address, pair) ->
             Text(text = "Address: $address Distance: ${pair.first}")
-        }
-    }
-}
-
-@Composable
-fun DistanceContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>){
-    Box(modifier = Modifier.padding(24.dp)) {
-        val dis1=devices[BLE1]
-        val dis2=devices[BLE2]
-        if (dis1!=null && dis2!=null) {
-            Text(
-                text = "Distance from BLE A: ${
-                    LineConstrainedTrilateration.estimate(
-                        Vec2(0.0, 0.0),
-                        Vec2(10.44, 0.0),
-                        dis1.first.toBigDecimal(),
-                        dis2.first.toBigDecimal()
-                    ).x.toBigDecimal().setScale(2, RoundingMode.HALF_EVEN)
-                }"
-            )
         }
     }
 }
