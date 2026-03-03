@@ -27,7 +27,7 @@ data class GeoLocation(val long: Double, val lat: Double, val alt: Double, val n
 }
 
 class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
-    fun insertPointInGraph(mutGraph: MutableMap<GeoLocation, MutableList<GeoLocation>>, point: GeoLocation){
+    fun insertPointInGraph(mutGraph: MutableMap<GeoLocation, MutableList<GeoLocation>>, point: GeoLocation): GeoLocation{
         var minDis= Double.MAX_VALUE
         var edgeStart: GeoLocation? = null
         var edgeEnd: GeoLocation? = null
@@ -43,13 +43,13 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
         }
 
         if(edgeStart==null || edgeEnd==null){
-            return
+            return point
         }
 
-        val pointToInsert = interpolate_onto_line(point, edgeStart, edgeEnd) ?: return
+        val pointToInsert = interpolate_onto_line(point, edgeStart, edgeEnd)
 
         if(pointToInsert==edgeStart || pointToInsert==edgeEnd){
-            return
+            return pointToInsert
         }
 
         mutGraph[pointToInsert]= mutableListOf(edgeStart,edgeEnd)
@@ -59,14 +59,18 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
 
         mutGraph[edgeStart]?.add(pointToInsert)
         mutGraph[edgeEnd]?.add(pointToInsert)
+
+        return pointToInsert
     }
 
-    fun route(start: GeoLocation,goal: GeoLocation): List<GeoLocation> {
+    fun route(start: GeoLocation, goal: GeoLocation): List<GeoLocation> {
         val mutGraph = graph.toMutableMap()
-        insertPointInGraph(mutGraph,start)
-        insertPointInGraph(mutGraph,goal)
+        val start = insertPointInGraph(mutGraph,start)
+        val goal = insertPointInGraph(mutGraph,goal)
 
-        val minQ = PriorityQueue<Pair<Double, List<GeoLocation>>>()
+        val minQ = PriorityQueue<Pair<Double, List<GeoLocation>>>(
+            compareBy { it.first }
+        )
         minQ.add(0.0 to listOf(start))
         while(minQ.isNotEmpty()){
             val (dis, curRoute)=minQ.poll()!!
