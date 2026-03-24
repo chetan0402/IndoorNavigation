@@ -19,11 +19,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SearchBar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 
@@ -89,6 +92,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Column {
+                ShowRouteContainer()
                 TrilaterateContainer(devices)
                 BLEContainer(devices)
             }
@@ -145,6 +149,24 @@ class MainActivity : ComponentActivity() {
 const val BLE1="2D:7E:1A:02:3D:21"
 const val BLE2="55:6D:EA:22:2C:71"
 const val BLE3="68:1A:9E:8C:E2:CB"
+
+@Preview
+@Composable
+fun ShowRouteContainerPreview(){
+    ShowRouteContainer()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShowRouteContainer(){
+    Box(modifier = Modifier.padding(24.dp)) {
+        SearchBar(
+            inputField = {},
+            expanded = false,
+            onExpandedChange = {}
+        ) { }
+    }
+}
 
 @Composable
 fun BLEContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>) {
