@@ -29,9 +29,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+data class DeviceScanInfo(
+    val distance: Double,
+    val predictor: RSSIDistancePredictor,
+    val lastSeen: Long
+)
+
+const val SCAN_TIMEOUT_MS = 15_000L
 
 class MainActivity : ComponentActivity() {
-    private var devices = mutableStateMapOf<String, Pair<Double, RSSIDistancePredictor>>()
+    private var devices = mutableStateMapOf<String, DeviceScanInfo>()
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
 
@@ -90,6 +101,18 @@ class MainActivity : ComponentActivity() {
 
         startBleScan()
 
+        // Cleanup old devices periodically
+        lifecycleScope.launch {
+            while (true) {
+                delay(1000)
+                val currentTime = System.currentTimeMillis()
+                val toRemove = devices.filter { (_, info) ->
+                    currentTime - info.lastSeen > SCAN_TIMEOUT_MS
+                }.keys
+                toRemove.forEach { devices.remove(it) }
+            }
+        }
+
         setContent {
             Column {
                 ShowRouteContainer()
@@ -109,17 +132,14 @@ class MainActivity : ComponentActivity() {
         scanCallback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
-                if(result.device.address != BLE1 && result.device.address != BLE2 && result.device.address != BLE3) return
-                if (devices[result.device.address] == null) {
-                    devices[result.device.address]= 0.0 to RSSIDistancePredictor()
-                }
-                devices[result.device.address]?.let {
-                    val predictor = it.second
-                    val (dis, _) = predictor.predict(result.rssi.toDouble())
-                    devices[result.device.address] = dis to predictor
-                }
-
-                //if(result.device.address == "2D:7E:1A:02:3D:21") Log.d("BLE_READ", "Device found: ${result.device.address} RSSI: ${result.rssi}")
+                val address = result.device.address
+                if(address != BLE1 && address != BLE2 && address != BLE3) return
+                
+                val currentInfo = devices[address]
+                val predictor = currentInfo?.predictor ?: RSSIDistancePredictor()
+                val (dis, _) = predictor.predict(result.rssi.toDouble())
+                
+                devices[address] = DeviceScanInfo(dis, predictor, System.currentTimeMillis())
             }
             override fun onScanFailed(errorCode: Int) {
                 Log.e("BLE", "Scan failed with error: $errorCode")
@@ -169,18 +189,18 @@ fun ShowRouteContainer(){
 }
 
 @Composable
-fun BLEContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>) {
+fun BLEContainer(devices: SnapshotStateMap<String, DeviceScanInfo>) {
     LazyColumn(
         modifier = Modifier.padding(24.dp)
     ) {
-        items(devices.entries.toList()) { (address, pair) ->
-            Text(text = "Address: $address Distance: ${pair.first}")
+        items(devices.entries.toList()) { (address, info) ->
+            Text(text = "Address: $address Distance: ${info.distance}")
         }
     }
 }
 
 @Composable
-fun TrilaterateContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDistancePredictor>>){
+fun TrilaterateContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
     Box(modifier=Modifier.padding(24.dp)){
         val dis1=devices[BLE1]
         val dis2=devices[BLE2]
@@ -194,9 +214,9 @@ fun TrilaterateContainer(devices: SnapshotStateMap<String, Pair<Double, RSSIDist
                         GeoLocation(0.0,11.0,0.0,"BLE3")
                     ),
                     listOf(
-                        dis1.first,
-                        dis2.first,
-                        dis3.first
+                        dis1.distance,
+                        dis2.distance,
+                        dis3.distance
                     )
                 )}"
             )
