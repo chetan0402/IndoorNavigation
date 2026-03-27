@@ -14,16 +14,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -115,8 +122,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             Column {
-                ShowRouteContainer()
-                TrilaterateContainer(devices)
+                ShowRouteContainer(devices)
                 BLEContainer(devices)
             }
         }
@@ -133,7 +139,7 @@ class MainActivity : ComponentActivity() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
                 val address = result.device.address
-                if(address != BLE1 && address != BLE2 && address != BLE3) return
+                if (address !in ANCHORS) return
                 
                 val currentInfo = devices[address]
                 val predictor = currentInfo?.predictor ?: RSSIDistancePredictor()
@@ -160,31 +166,106 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-//@Preview
-//@Composable
-//fun BLEContainerPreview() {
-//    BLEContainer(devices = emptyMap())
-//}
-
 const val BLE1="2D:7E:1A:02:3D:21"
 const val BLE2="55:6D:EA:22:2C:71"
 const val BLE3="68:1A:9E:8C:E2:CB"
 
+val ANCHORS = mapOf(
+    BLE1 to GeoLocation(0.0, 0.0, 0.0, "BLE1"),
+    BLE2 to GeoLocation(10.0, 0.0, 0.0, "BLE2"),
+    BLE3 to GeoLocation(0.0, 11.0, 0.0, "BLE3")
+)
+
+val POINT_A = GeoLocation(2.0, 2.0, 0.0, "Room 101")
+val POINT_B = GeoLocation(8.0, 2.0, 0.0, "Room 102")
+val POINT_C = GeoLocation(5.0, 8.0, 0.0, "Main Hall")
+val POINT_D = GeoLocation(5.0, 5.0, 0.0, "Intersection")
+
+val NAV_GRAPH = mapOf(
+    POINT_A to mutableListOf(POINT_D),
+    POINT_B to mutableListOf(POINT_D),
+    POINT_C to mutableListOf(POINT_D),
+    POINT_D to mutableListOf(POINT_A, POINT_B, POINT_C)
+)
+
 @Preview
 @Composable
 fun ShowRouteContainerPreview(){
-    ShowRouteContainer()
+    val state = remember { mutableStateMapOf<String, DeviceScanInfo>() }
+    ShowRouteContainer(state)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShowRouteContainer(){
-    Box(modifier = Modifier.padding(24.dp)) {
-        SearchBar(
-            inputField = {},
-            expanded = false,
-            onExpandedChange = {}
-        ) { }
+fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
+    var query by remember { mutableStateOf("") }
+    var active by remember { mutableStateOf(false) }
+    var route by remember { mutableStateOf<List<GeoLocation>?>(null) }
+
+    val searchResults = remember(query) {
+        NAV_GRAPH.keys.filter {
+            it.name.contains(query, ignoreCase = true) && it.name.isNotEmpty()
+        }
+    }
+
+    Column {
+        Box(modifier = Modifier.padding(24.dp)) {
+            SearchBar(
+                inputField = {
+                    SearchBarDefaults.InputField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        onSearch = { active = false },
+                        expanded = active,
+                        onExpandedChange = { active = it },
+                        placeholder = { Text("Search location...") }
+                    )
+                },
+                expanded = active,
+                onExpandedChange = { active = it }
+            ) {
+                LazyColumn {
+                    items(searchResults) { location ->
+                        ListItem(
+                            headlineContent = { Text(location.name) },
+                            modifier = Modifier.clickable {
+                                query = location.name
+                                active = false
+                                // Calculate route
+                                val detectedAnchors = devices.mapNotNull { (address, info) ->
+                                    ANCHORS[address]?.let { it to info.distance }
+                                }
+
+                                if (detectedAnchors.size >= 3) {
+                                    val (anchors, distances) = detectedAnchors.unzip()
+                                    val pathFinder = PathFind(NAV_GRAPH)
+                                    val currentLocation = pathFinder.trilaterate(anchors, distances)
+                                    route = pathFinder.route(currentLocation, location)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        route?.let {
+            RouteDisplay(it)
+        }
+    }
+}
+
+@Composable
+fun RouteDisplay(route: List<GeoLocation>) {
+    Column(modifier = Modifier.padding(24.dp)) {
+        Text(text = "Path to Destination:")
+        LazyColumn {
+            items(route) { geo ->
+                Text(
+                    text = geo.name.ifEmpty { "(${geo.long}, ${geo.lat})" },
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+        }
     }
 }
 
@@ -195,31 +276,6 @@ fun BLEContainer(devices: SnapshotStateMap<String, DeviceScanInfo>) {
     ) {
         items(devices.entries.toList()) { (address, info) ->
             Text(text = "Address: $address Distance: ${info.distance}")
-        }
-    }
-}
-
-@Composable
-fun TrilaterateContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
-    Box(modifier=Modifier.padding(24.dp)){
-        val dis1=devices[BLE1]
-        val dis2=devices[BLE2]
-        val dis3=devices[BLE3]
-        if (dis1!=null && dis2!=null && dis3!=null){
-            Text(
-                text = "${PathFind(emptyMap()).trilaterate(
-                    listOf(
-                        GeoLocation(0.0,0.0,0.0,"BLE1"),
-                        GeoLocation(10.0,0.0,0.0,"BLE2"),
-                        GeoLocation(0.0,11.0,0.0,"BLE3")
-                    ),
-                    listOf(
-                        dis1.distance,
-                        dis2.distance,
-                        dis3.distance
-                    )
-                )}"
-            )
         }
     }
 }
