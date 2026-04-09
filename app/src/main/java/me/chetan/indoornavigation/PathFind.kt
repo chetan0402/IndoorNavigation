@@ -102,6 +102,28 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
     ): GeoLocation {
 
         require(anchors.size == distances.size)
+
+        if (anchors.size == 2) {
+            val a1 = anchors[0]
+            val a2 = anchors[1]
+            val d1 = distances[0]
+            val d2 = distances[1]
+
+            val d = distance_between_point(a1, a2)
+            if (d < 1e-9) return a1
+
+            // 2D-based least-error position on the line connecting the two anchors.
+            // This calculates the intersection of the radical axis with the line.
+            val x = (d1 * d1 - d2 * d2 + d * d) / (2 * d)
+            val ratio = x / d
+
+            return GeoLocation(
+                long = a1.long + ratio * (a2.long - a1.long),
+                lat = a1.lat + ratio * (a2.lat - a1.lat),
+                alt = a1.alt + ratio * (a2.alt - a1.alt)
+            )
+        }
+
         require(anchors.size >= 3)
 
         // Initial guess: centroid of anchors
