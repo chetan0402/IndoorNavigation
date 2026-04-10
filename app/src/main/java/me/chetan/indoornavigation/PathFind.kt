@@ -66,7 +66,6 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
     fun route(start: GeoLocation, goal: GeoLocation): List<GeoLocation> {
         val mutGraph = graph.toMutableMap()
         val start = insertPointInGraph(mutGraph,start)
-        val goal = insertPointInGraph(mutGraph,goal)
 
         val minQ = PriorityQueue<Pair<Double, List<GeoLocation>>>(
             compareBy { it.first }

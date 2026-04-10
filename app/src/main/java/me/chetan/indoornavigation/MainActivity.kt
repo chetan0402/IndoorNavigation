@@ -14,9 +14,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -172,27 +177,30 @@ const val BLE3="68:1A:9E:8C:E2:CB"
 
 val ANCHORS = mapOf(
     BLE1 to GeoLocation(0.0, 0.0, 0.0, "BLE1"),
-    BLE2 to GeoLocation(10.0, 0.0, 0.0, "BLE2"),
-    BLE3 to GeoLocation(0.0, 11.0, 0.0, "BLE3")
+    BLE2 to GeoLocation(16.32, 0.0, 0.0, "BLE2")
 )
 
-val POINT_A = GeoLocation(2.0, 2.0, 0.0, "Room 101")
-val POINT_B = GeoLocation(8.0, 2.0, 0.0, "Room 102")
-val POINT_C = GeoLocation(5.0, 8.0, 0.0, "Main Hall")
-val POINT_D = GeoLocation(5.0, 5.0, 0.0, "Intersection")
+val POINT_A = GeoLocation(0.0, 0.0, 0.0, "Start")
+val POINT_B = GeoLocation(9.8, 0.0, 0.0, "First point")
+val POINT_C = GeoLocation(16.32, 0.0, 0.0, "Finish")
 
 val NAV_GRAPH = mapOf(
-    POINT_A to mutableListOf(POINT_D),
-    POINT_B to mutableListOf(POINT_D),
-    POINT_C to mutableListOf(POINT_D),
-    POINT_D to mutableListOf(POINT_A, POINT_B, POINT_C)
+    POINT_A to mutableListOf(POINT_B),
+    POINT_B to mutableListOf(POINT_A,POINT_C),
+    POINT_C to mutableListOf(POINT_B),
 )
 
-@Preview
+@Preview(showBackground = true)
 @Composable
 fun ShowRouteContainerPreview(){
     val state = remember { mutableStateMapOf<String, DeviceScanInfo>() }
     ShowRouteContainer(state)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RouteGraphPreview() {
+    RouteGraph(graph = NAV_GRAPH, route = listOf(POINT_A, POINT_B))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -236,7 +244,7 @@ fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
                                     ANCHORS[address]?.let { it to info.distance }
                                 }
 
-                                if (detectedAnchors.size >= 3) {
+                                if (detectedAnchors.size >= 2) {
                                     val (anchors, distances) = detectedAnchors.unzip()
                                     val pathFinder = PathFind(NAV_GRAPH)
                                     val currentLocation = pathFinder.trilaterate(anchors, distances)
@@ -250,6 +258,7 @@ fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
         }
         route?.let {
             RouteDisplay(it)
+            RouteGraph(NAV_GRAPH, it)
         }
     }
 }
@@ -258,14 +267,89 @@ fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
 fun RouteDisplay(route: List<GeoLocation>) {
     Column(modifier = Modifier.padding(24.dp)) {
         Text(text = "Path to Destination:")
-        LazyColumn {
+        LazyColumn(modifier = Modifier.height(150.dp)) {
             items(route) { geo ->
                 Text(
-                    text = geo.name.ifEmpty { "(${geo.long}, ${geo.lat})" },
+                    text = "(${geo.name} ${geo.long}, ${geo.lat})",
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
         }
+    }
+}
+
+@Composable
+fun RouteGraph(graph: Map<GeoLocation, List<GeoLocation>>, route: List<GeoLocation>) {
+    val allPoints = graph.keys + graph.values.flatten() + route
+    val minLong = allPoints.minOfOrNull { it.long } ?: 0.0
+    val maxLong = allPoints.maxOfOrNull { it.long } ?: 1.0
+    val minLat = allPoints.minOfOrNull { it.lat } ?: 0.0
+    val maxLat = allPoints.maxOfOrNull { it.lat } ?: 1.0
+
+    val padding = 50f
+
+    Canvas(modifier = Modifier
+        .fillMaxWidth()
+        .height(300.dp)
+        .padding(24.dp)) {
+        val width = size.width - 2 * padding
+        val height = size.height - 2 * padding
+
+        fun GeoLocation.toOffset(): Offset {
+            val x = if (maxLong > minLong) {
+                padding + ((long - minLong) / (maxLong - minLong) * width).toFloat()
+            } else padding
+            val y = if (maxLat > minLat) {
+                padding + ((lat - minLat) / (maxLat - minLat) * height).toFloat()
+            } else padding
+            return Offset(x, y)
+        }
+
+        // Draw all edges
+        graph.forEach { (start, neighbors) ->
+            val startOffset = start.toOffset()
+            neighbors.forEach { end ->
+                drawLine(
+                    color = Color.LightGray,
+                    start = startOffset,
+                    end = end.toOffset(),
+                    strokeWidth = 2f
+                )
+            }
+        }
+
+        // Draw route
+        if (route.size >= 2) {
+            for (i in 0 until route.size - 1) {
+                drawLine(
+                    color = Color.Blue,
+                    start = route[i].toOffset(),
+                    end = route[i + 1].toOffset(),
+                    strokeWidth = 8f
+                )
+            }
+        }
+
+        // Draw points
+        allPoints.distinct().forEach { point ->
+            drawCircle(
+                color = if (point in route) Color.Blue else Color.Gray,
+                radius = if (point in route) 10f else 6f,
+                center = point.toOffset()
+            )
+        }
+
+        drawCircle(
+            color = Color.Blue,
+            radius = 14f,
+            center = route.last().toOffset()
+        )
+
+        drawCircle(
+            color = Color.Red,
+            radius = 14f,
+            center = route.first().toOffset()
+        )
     }
 }
 
