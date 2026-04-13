@@ -1,6 +1,7 @@
 package me.chetan.indoornavigation
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -174,20 +175,25 @@ class MainActivity : ComponentActivity() {
 const val BLE1="2D:7E:1A:02:3D:21"
 const val BLE2="55:6D:EA:22:2C:71"
 const val BLE3="68:1A:9E:8C:E2:CB"
+const val BLE4="25:B6:BE:A7:E6:47"
 
 val ANCHORS = mapOf(
     BLE1 to GeoLocation(0.0, 0.0, 0.0, "BLE1"),
-    BLE2 to GeoLocation(16.32, 0.0, 0.0, "BLE2")
+    BLE2 to GeoLocation(16.32, 0.0, 0.0, "BLE2"),
+    BLE3 to GeoLocation(27.9, 0.0, 0.0, "BLE3"),
+    BLE4 to GeoLocation(long=27.9,13.66,0.0,"BLE4")
 )
 
-val POINT_A = GeoLocation(0.0, 0.0, 0.0, "Start")
-val POINT_B = GeoLocation(9.8, 0.0, 0.0, "First point")
-val POINT_C = GeoLocation(16.32, 0.0, 0.0, "Finish")
+val POINT_A = GeoLocation(0.0, 0.0, 0.0, "PointA")
+val POINT_B = GeoLocation(12.53, 0.0, 0.0, "PointB")
+val POINT_C = GeoLocation(27.9, 0.0, 0.0, "PointC")
+val POINT_D= GeoLocation(27.9,13.66,0.0,"PointD")
 
 val NAV_GRAPH = mapOf(
     POINT_A to mutableListOf(POINT_B),
     POINT_B to mutableListOf(POINT_A,POINT_C),
-    POINT_C to mutableListOf(POINT_B),
+    POINT_C to mutableListOf(POINT_B,POINT_D),
+    POINT_D to mutableListOf(POINT_C)
 )
 
 @Preview(showBackground = true)
@@ -203,12 +209,32 @@ fun RouteGraphPreview() {
     RouteGraph(graph = NAV_GRAPH, route = listOf(POINT_A, POINT_B))
 }
 
+@SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
-    var route by remember { mutableStateOf<List<GeoLocation>?>(null) }
+    var selectedDestination by remember { mutableStateOf<GeoLocation?>(null) }
+
+    val currentLocation = remember(devices.size, devices.values.map { it.distance }) {
+        val detectedAnchors = devices.mapNotNull { (address, info) ->
+            ANCHORS[address]?.let { it to info.distance }
+        }
+
+        if (detectedAnchors.size >= 2) {
+            val (anchors, distances) = detectedAnchors.unzip()
+            val pathFinder = PathFind(NAV_GRAPH)
+            pathFinder.trilaterate(anchors, distances)
+        } else null
+    }
+
+    val route = remember(currentLocation, selectedDestination) {
+        if (currentLocation != null && selectedDestination != null) {
+            val pathFinder = PathFind(NAV_GRAPH)
+            pathFinder.route(currentLocation, selectedDestination!!)
+        } else null
+    }
 
     val searchResults = remember(query) {
         NAV_GRAPH.keys.filter {
@@ -238,27 +264,25 @@ fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
                             headlineContent = { Text(location.name) },
                             modifier = Modifier.clickable {
                                 query = location.name
+                                selectedDestination = location
                                 active = false
-                                // Calculate route
-                                val detectedAnchors = devices.mapNotNull { (address, info) ->
-                                    ANCHORS[address]?.let { it to info.distance }
-                                }
-
-                                if (detectedAnchors.size >= 2) {
-                                    val (anchors, distances) = detectedAnchors.unzip()
-                                    val pathFinder = PathFind(NAV_GRAPH)
-                                    val currentLocation = pathFinder.trilaterate(anchors, distances)
-                                    route = pathFinder.route(currentLocation, location)
-                                }
                             }
                         )
                     }
                 }
             }
         }
+        
+        currentLocation?.let {
+            Text(
+                text = "Current Location: (${String.format("%.2f", it.long)}, ${String.format("%.2f", it.lat)})",
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+        }
+
         route?.let {
             RouteDisplay(it)
-            RouteGraph(NAV_GRAPH, it)
+            RouteGraph(NAV_GRAPH, it, currentLocation)
         }
     }
 }
@@ -279,8 +303,12 @@ fun RouteDisplay(route: List<GeoLocation>) {
 }
 
 @Composable
-fun RouteGraph(graph: Map<GeoLocation, List<GeoLocation>>, route: List<GeoLocation>) {
-    val allPoints = graph.keys + graph.values.flatten() + route
+fun RouteGraph(
+    graph: Map<GeoLocation, List<GeoLocation>>,
+    route: List<GeoLocation>,
+    currentLocation: GeoLocation? = null
+) {
+    val allPoints = graph.keys + graph.values.flatten() + route + listOfNotNull(currentLocation)
     val minLong = allPoints.minOfOrNull { it.long } ?: 0.0
     val maxLong = allPoints.maxOfOrNull { it.long } ?: 1.0
     val minLat = allPoints.minOfOrNull { it.lat } ?: 0.0
@@ -336,6 +364,14 @@ fun RouteGraph(graph: Map<GeoLocation, List<GeoLocation>>, route: List<GeoLocati
                 color = if (point in route) Color.Blue else Color.Gray,
                 radius = if (point in route) 10f else 6f,
                 center = point.toOffset()
+            )
+        }
+
+        if (currentLocation != null) {
+            drawCircle(
+                color = Color.Green,
+                radius = 16f,
+                center = currentLocation.toOffset()
             )
         }
 

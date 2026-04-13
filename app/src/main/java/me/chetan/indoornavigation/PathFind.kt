@@ -64,13 +64,13 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
     }
 
     fun route(start: GeoLocation, goal: GeoLocation): List<GeoLocation> {
-        val mutGraph = graph.toMutableMap()
-        val start = insertPointInGraph(mutGraph,start)
+        val mutGraph = graph.mapValues { it.value.toMutableList() }.toMutableMap()
+        val startPoint = insertPointInGraph(mutGraph, start)
 
         val minQ = PriorityQueue<Pair<Double, List<GeoLocation>>>(
             compareBy { it.first }
         )
-        minQ.add(0.0 to listOf(start))
+        minQ.add(0.0 to listOf(startPoint))
         while(minQ.isNotEmpty()){
             val (dis, curRoute)=minQ.poll()!!
             if(curRoute.last()==goal) {
@@ -85,13 +85,6 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
         }
 
         return listOf()
-    }
-
-    fun pos(device: String): GeoLocation?{
-        return mapOf(
-            "2D:7E:1A:02:3D:21" to GeoLocation(0.0,0.0,0.0),
-            "55:6D:EA:22:2C:71" to GeoLocation(0.0,0.0,0.0)
-        )[device] // TODO: get pos of each device based on their device ID
     }
 
     fun trilaterate(
