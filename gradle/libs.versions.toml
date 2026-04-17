@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.0"
+agp = "9.1.1"
 jakartaXmlBindApi = "4.0.5"
 jaxbImpl = "4.0.6"
 kotlin = "2.2.10"
