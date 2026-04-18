@@ -15,6 +15,14 @@
       </SelectionState>
       <SelectionState runConfigName="ShowRouteContainerPreview">
         <option name="selectionMode" value="DROPDOWN" />
+        <DropdownSelection timestamp="2026-02-21T09:18:38.377378232Z">
+          <Target type="DEFAULT_BOOT">
+            <handle>
+              <DeviceId pluginId="Default" identifier="serial=10.129.11.233:36243;connection=db2c4b6c" />
+            </handle>
+          </Target>
+        </DropdownSelection>
+        <DialogSelection />
       </SelectionState>
     </selectionStates>
   </component>

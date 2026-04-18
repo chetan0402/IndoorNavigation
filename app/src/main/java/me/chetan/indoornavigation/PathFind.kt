@@ -87,6 +87,56 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
         return listOf()
     }
 
+    fun trilateratePlanar(
+        anchors: List<GeoLocation>,
+        distances: List<Double>
+    ): GeoLocation {
+        val p1 = anchors[0]
+        val p2 = anchors[1]
+        val p3 = anchors[2]
+
+        // 1. Define Local Coordinate System (Basis Vectors)
+        // Vector eX is the direction from p1 to p2
+        val ex = doubleArrayOf(p2.long - p1.long, p2.lat - p1.lat, p2.alt - p1.alt)
+        val d = sqrt(ex[0]*ex[0] + ex[1]*ex[1] + ex[2]*ex[2])
+        for (i in 0..2) ex[i] /= d
+
+        // Vector p31 is vector from p1 to p3
+        val p31 = doubleArrayOf(p3.long - p1.long, p3.lat - p1.lat, p3.alt - p1.alt)
+
+        // i is the signed magnitude of p31 projected onto ex
+        val i = ex[0]*p31[0] + ex[1]*p31[1] + ex[2]*p31[2]
+
+        // Vector ey is the direction perpendicular to ex in the plane of the 3 points
+        val ey = doubleArrayOf(
+            p31[0] - i * ex[0],
+            p31[1] - i * ex[1],
+            p31[2] - i * ex[2]
+        )
+        val j = sqrt(ey[0]*ey[0] + ey[1]*ey[1] + ey[2]*ey[2])
+        for (k in 0..2) ey[k] /= j
+
+        // 2. Solve for (x, y) in the local 2D plane
+        // Equations:
+        // x^2 + y^2 = d1^2
+        // (x-d)^2 + y^2 = d2^2
+        // (x-i)^2 + (y-j)^2 = d3^2
+
+        val r1 = distances[0]
+        val r2 = distances[1]
+        val r3 = distances[2]
+
+        val x = (r1 * r1 - r2 * r2 + d * d) / (2 * d)
+        val y = (r1 * r1 - r3 * r3 + i * i + j * j) / (2 * j) - (i / j) * x
+
+        // 3. Project back to Global 3D Coordinates
+        return GeoLocation(
+            long = p1.long + x * ex[0] + y * ey[0],
+            lat = p1.lat + x * ex[1] + y * ey[1],
+            alt = p1.alt + x * ex[2] + y * ey[2]
+        )
+    }
+
     fun trilaterate(
         anchors: List<GeoLocation>,
         distances: List<Double>,
@@ -115,6 +165,7 @@ class PathFind(val graph: Map<GeoLocation, MutableList<GeoLocation>>) {
                 alt = a1.alt + ratio * (a2.alt - a1.alt)
             )
         }
+        if(anchors.size == 3) return trilateratePlanar(anchors,distances)
 
         require(anchors.size >= 3)
 
