@@ -2,26 +2,25 @@ package me.chetan.indoornavigation
 
 import java.util.PriorityQueue
 import kotlin.math.abs
+import kotlin.math.round
 import kotlin.math.sqrt
 
 data class GeoLocation(val long: Double, val lat: Double, val alt: Double, val name: String = "") {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+        if (other !is GeoLocation) return false
 
-        other as GeoLocation
-
-        if (long != other.long) return false
-        if (lat != other.lat) return false
-        if (alt != other.alt) return false
-
-        return true
+        val precision = 10000.0
+        return round(long * precision) == round(other.long * precision) &&
+               round(lat * precision) == round(other.lat * precision) &&
+               round(alt * precision) == round(other.alt * precision)
     }
 
     override fun hashCode(): Int {
-        var result = long.hashCode()
-        result = 31 * result + lat.hashCode()
-        result = 31 * result + alt.hashCode()
+        val precision = 10000.0
+        var result = round(long * precision).hashCode()
+        result = 31 * result + round(lat * precision).hashCode()
+        result = 31 * result + round(alt * precision).hashCode()
         return result
     }
 }

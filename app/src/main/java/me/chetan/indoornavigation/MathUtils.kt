@@ -3,32 +3,10 @@ package me.chetan.indoornavigation
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-fun distance_from_line(point: GeoLocation, lineStart: GeoLocation?, lineEnd: GeoLocation?): Double{
-    if(lineStart==null || lineEnd==null) return Double.MAX_VALUE
-    // 1. Create vectors relative to lineStart
-    val ax = lineEnd.long - lineStart.long
-    val ay = lineEnd.lat - lineStart.lat
-    val az = lineEnd.alt - lineStart.alt
-
-    val bx = point.long - lineStart.long
-    val by = point.lat - lineStart.lat
-    val bz = point.alt - lineStart.alt
-
-    // 2. Calculate Cross Product (A x B)
-    val crossX = ay * bz - az * by
-    val crossY = az * bx - ax * bz
-    val crossZ = ax * by - ay * bx
-
-    // 3. Calculate Magnitudes
-    val areaOfParallelogram = sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ)
-    val lengthOfLine = sqrt(ax * ax + ay * ay + az * az)
-
-    // 4. Handle edge case: lineStart and lineEnd are the same point
-    if (lengthOfLine == 0.0) {
-        return sqrt(bx * bx + by * by + bz * bz)
-    }
-
-    return areaOfParallelogram / lengthOfLine
+fun distance_from_line(point: GeoLocation, lineStart: GeoLocation?, lineEnd: GeoLocation?): Double {
+    if (lineStart == null || lineEnd == null) return Double.MAX_VALUE
+    val nearest = interpolate_onto_line(point, lineStart, lineEnd)
+    return distance_between_point(point, nearest)
 }
 
 fun interpolate_onto_line(point: GeoLocation, lineStart: GeoLocation, lineEnd: GeoLocation): GeoLocation{
