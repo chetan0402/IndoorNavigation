@@ -16,19 +16,44 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -36,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -45,6 +71,7 @@ import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class DeviceScanInfo(
     val distance: Double,
@@ -81,6 +108,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -127,9 +155,22 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            Column {
-                ShowRouteContainer(devices)
-                BLEContainer(devices)
+            MaterialTheme {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Indoor Navigation") }
+                        )
+                    }
+                ) { innerPadding ->
+                    Column(
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize()
+                    ) {
+                        ShowRouteContainer(devices)
+                    }
+                }
             }
         }
     }
@@ -215,7 +256,7 @@ fun RouteGraphPreview() {
 @SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
+fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>) {
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
     var selectedDestination by remember { mutableStateOf<GeoLocation?>(null) }
@@ -229,9 +270,9 @@ fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
             val (anchors, distances) = detectedAnchors.unzip()
             val pathFinder = PathFind(NAV_GRAPH)
             pathFinder.trilaterate(anchors, distances)
-        } else if (detectedAnchors.size == 1){
+        } else if (detectedAnchors.size == 1) {
             detectedAnchors.first().first
-        }else null
+        } else null
     }
 
     val route = remember(currentLocation, selectedDestination) {
@@ -247,61 +288,122 @@ fun ShowRouteContainer(devices: SnapshotStateMap<String, DeviceScanInfo>){
         }
     }
 
-    Column {
-        Box(modifier = Modifier.padding(24.dp)) {
-            SearchBar(
-                inputField = {
-                    SearchBarDefaults.InputField(
-                        query = query,
-                        onQueryChange = { query = it },
-                        onSearch = { active = false },
-                        expanded = active,
-                        onExpandedChange = { active = it },
-                        placeholder = { Text("Search location...") }
+    Column(modifier = Modifier.fillMaxSize()) {
+        SearchBar(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            inputField = {
+                SearchBarDefaults.InputField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearch = { active = false },
+                    expanded = active,
+                    onExpandedChange = { active = it },
+                    placeholder = { Text("Where to?") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                )
+            },
+            expanded = active,
+            onExpandedChange = { active = it }
+        ) {
+            LazyColumn {
+                items(searchResults) { location ->
+                    ListItem(
+                        headlineContent = { Text(location.name) },
+                        supportingContent = { Text("${String.format(Locale.US, "%.2f", location.long)}, ${String.format(Locale.US, "%.2f", location.lat)}") },
+                        leadingContent = { Icon(Icons.Default.Place, contentDescription = null) },
+                        modifier = Modifier.clickable {
+                            query = location.name
+                            selectedDestination = location
+                            active = false
+                        }
                     )
-                },
-                expanded = active,
-                onExpandedChange = { active = it }
-            ) {
-                LazyColumn {
-                    items(searchResults) { location ->
-                        ListItem(
-                            headlineContent = { Text(location.name) },
-                            modifier = Modifier.clickable {
-                                query = location.name
-                                selectedDestination = location
-                                active = false
-                            }
-                        )
-                    }
                 }
             }
         }
-        
-        currentLocation?.let {
-            Text(
-                text = "Current Location: (${String.format("%.2f", it.long)}, ${String.format("%.2f", it.lat)})",
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-        }
 
-        route?.let {
-            RouteDisplay(it)
-            RouteGraph(NAV_GRAPH, it, currentLocation)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+        ) {
+            currentLocation?.let {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Your Location",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Text(
+                                text = "(${String.format(Locale.US, "%.2f", it.long)}, ${String.format(Locale.US, "%.2f", it.lat)})",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            }
+
+            route?.let {
+                Spacer(modifier = Modifier.height(16.dp))
+                RouteDisplay(it)
+                Spacer(modifier = Modifier.height(16.dp))
+                RouteGraph(NAV_GRAPH, it, currentLocation)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            BLEContainer(devices)
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
 fun RouteDisplay(route: List<GeoLocation>) {
-    Column(modifier = Modifier.padding(24.dp)) {
-        Text(text = "Path to Destination:")
-        LazyColumn(modifier = Modifier.height(150.dp)) {
-            items(route) { geo ->
-                Text(
-                    text = "(${geo.name} ${geo.long}, ${geo.lat})",
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Navigation Path", style = MaterialTheme.typography.titleMedium)
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            LazyColumn(modifier = Modifier.height(120.dp)) {
+                items(route) { geo ->
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = if (geo.name.isNotEmpty()) geo.name else "(${String.format(Locale.US, "%.2f", geo.long)}, ${String.format(Locale.US, "%.2f", geo.lat)})",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
             }
         }
     }
@@ -320,11 +422,16 @@ fun RouteGraph(
     val maxLat = allPoints.maxOfOrNull { it.lat } ?: 1.0
 
     val padding = 50f
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
 
-    Canvas(modifier = Modifier
-        .fillMaxWidth()
-        .height(300.dp)
-        .padding(24.dp)) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
         val width = size.width - 2 * padding
         val height = size.height - 2 * padding
 
@@ -355,10 +462,10 @@ fun RouteGraph(
         if (route.size >= 2) {
             for (i in 0 until route.size - 1) {
                 drawLine(
-                    color = Color.Blue,
+                    color = primaryColor,
                     start = route[i].toOffset(),
                     end = route[i + 1].toOffset(),
-                    strokeWidth = 8f
+                    strokeWidth = 10f
                 )
             }
         }
@@ -366,7 +473,7 @@ fun RouteGraph(
         // Draw points
         allPoints.distinct().forEach { point ->
             drawCircle(
-                color = if (point in route) Color.Blue else Color.Gray,
+                color = if (point in route) primaryColor else Color.Gray,
                 radius = if (point in route) 10f else 6f,
                 center = point.toOffset()
             )
@@ -374,20 +481,20 @@ fun RouteGraph(
 
         if (currentLocation != null) {
             drawCircle(
-                color = Color.Green,
+                color = Color(0xFF4CAF50), // Green
                 radius = 16f,
                 center = currentLocation.toOffset()
             )
         }
 
         drawCircle(
-            color = Color.Blue,
+            color = secondaryColor,
             radius = 14f,
             center = route.last().toOffset()
         )
 
         drawCircle(
-            color = Color.Red,
+            color = Color(0xFFF44336), // Red
             radius = 14f,
             center = route.first().toOffset()
         )
@@ -396,11 +503,41 @@ fun RouteGraph(
 
 @Composable
 fun BLEContainer(devices: SnapshotStateMap<String, DeviceScanInfo>) {
-    LazyColumn(
-        modifier = Modifier.padding(24.dp)
+    if (devices.isEmpty()) return
+
+    Card(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        items(devices.entries.toList()) { (address, info) ->
-            Text(text = "Address: $address Distance: ${info.distance}")
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Detected Anchors", style = MaterialTheme.typography.titleSmall)
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            devices.forEach { (address, info) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = ANCHORS[address]?.name ?: address,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "${String.format(Locale.US, "%.2f", info.distance)}m",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
     }
 }
