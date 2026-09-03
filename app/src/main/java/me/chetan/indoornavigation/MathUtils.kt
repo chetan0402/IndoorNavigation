@@ -1,5 +1,6 @@
 package me.chetan.indoornavigation
 
+import me.chetan.indoornavigation.data.GeoLocation
 import kotlin.math.pow
 import kotlin.math.sqrt
 
