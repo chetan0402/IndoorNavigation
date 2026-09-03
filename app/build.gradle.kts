@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "me.chetan.indoornavigation"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "me.chetan.indoornavigation"

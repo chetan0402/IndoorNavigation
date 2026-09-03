@@ -1,6 +1,5 @@
 package me.chetan.indoornavigation
 
-import Model
 import java.util.ArrayDeque
 import kotlin.math.max
 import kotlin.math.min
