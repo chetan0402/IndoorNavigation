@@ -1,5 +1,6 @@
 package me.chetan.indoornavigation
 
+import me.chetan.indoornavigation.data.GeoLocation
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
