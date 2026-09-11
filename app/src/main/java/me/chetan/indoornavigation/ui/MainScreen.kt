@@ -36,8 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import me.chetan.indoornavigation.PathFind
-import me.chetan.indoornavigation.data.ANCHORS
 import me.chetan.indoornavigation.data.DeviceScanInfo
+import me.chetan.indoornavigation.data.FilterEstimate
 import me.chetan.indoornavigation.data.GeoLocation
 import me.chetan.indoornavigation.data.NAV_GRAPH
 import me.chetan.indoornavigation.ui.components.BLEContainer
@@ -48,27 +48,17 @@ import java.util.Locale
 @SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(devices: Map<String, DeviceScanInfo>) {
+fun MainScreen(devices: Map<String, DeviceScanInfo>, userEstimate: FilterEstimate) {
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
     var selectedDestination by remember { mutableStateOf<GeoLocation?>(null) }
 
-    val currentLocation = remember(devices.size, devices.values.map { it.distance }) {
-        val detectedAnchors = devices.mapNotNull { (address, info) ->
-            ANCHORS[address]?.let { it to info.distance }
-        }
-
-        if (detectedAnchors.size >= 2) {
-            val (anchors, distances) = detectedAnchors.unzip()
-            val pathFinder = PathFind(NAV_GRAPH.mapValues { it.value.toMutableList() })
-            pathFinder.trilaterate(anchors, distances)
-        } else if (detectedAnchors.size == 1) {
-            detectedAnchors.first().first
-        } else null
+    val currentLocation = remember(userEstimate) {
+        GeoLocation(userEstimate.x, userEstimate.y, userEstimate.z, "Current Location")
     }
 
     val route = remember(currentLocation, selectedDestination) {
-        if (currentLocation != null && selectedDestination != null) {
+        if (selectedDestination != null) {
             val pathFinder = PathFind(NAV_GRAPH.mapValues { it.value.toMutableList() })
             pathFinder.route(currentLocation, selectedDestination!!)
         } else null
@@ -121,33 +111,31 @@ fun MainScreen(devices: Map<String, DeviceScanInfo>) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            currentLocation?.let {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Your Location",
+                            style = MaterialTheme.typography.labelMedium
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Your Location",
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            Text(
-                                text = "(${String.format(Locale.US, "%.2f", it.long)}, ${String.format(Locale.US, "%.2f", it.lat)})",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
+                        Text(
+                            text = "(${String.format(Locale.US, "%.2f", currentLocation.long)}, ${String.format(Locale.US, "%.2f", currentLocation.lat)})",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                     }
                 }
             }

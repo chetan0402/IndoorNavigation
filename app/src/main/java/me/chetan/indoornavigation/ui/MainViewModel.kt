@@ -67,8 +67,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
     }
 
     private fun registerSensors() {
-        stepSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
-        rotationSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
+        if (stepSensor == null) {
+            Log.e("Sensor", "Step Detector sensor not available on this device")
+        } else {
+            sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_FASTEST)
+        }
+        
+        if (rotationSensor == null) {
+            Log.e("Sensor", "Rotation Vector sensor not available on this device")
+        } else {
+            sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_FASTEST)
+        }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -78,6 +87,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 // Assuming average step length is 0.7m
                 particleFilter.predict(step = 0.7, phoneAzimuth = currentDirection, variance = 0.05)
                 userLocation.value = particleFilter.estimate()
+                Log.d("Sensor", "Step detected! Moving user 0.7m at azimuth $currentDirection")
             }
             Sensor.TYPE_ROTATION_VECTOR -> {
                 val rotationMatrix = FloatArray(9)

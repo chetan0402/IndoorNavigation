@@ -37,6 +37,9 @@ class MainActivity : ComponentActivity() {
         }
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            add(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
     }.toTypedArray()
 
     private val permissionLauncher = registerForActivityResult(
@@ -79,7 +82,7 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding)
                             .fillMaxSize()
                     ) {
-                        MainScreen(viewModel.devices)
+                        MainScreen(viewModel.devices, viewModel.userLocation.value)
                     }
                 }
             }
