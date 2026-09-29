@@ -4,7 +4,6 @@ import me.chetan.indoornavigation.data.Measurement
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
@@ -13,12 +12,11 @@ import kotlin.math.sqrt
 class ParticleFilterTest {
 
     @Test
-    fun testHeadingEstimation() {
+    fun testMovementPrediction() {
         val filter = ParticleFilter(numParticles = 5000)
         filter.setBounds(0.0, 0.0, 0.0, 100.0, 100.0, 2.0)
         
-        val trueHeadingOffset = -PI / 2.0
-        val phoneAzimuth = PI / 2.0
+        val phoneAzimuth = 0.0 // Walking in +X direction
         var currentX = 10.0
         var currentY = 10.0
         val trueZ = 0.5
@@ -34,22 +32,21 @@ class ParticleFilterTest {
         for (i in 1..50) {
             val measurements = anchors.map { anchor ->
                 val dist = sqrt((currentX - anchor.first).pow(2) + (currentY - anchor.second).pow(2) + (trueZ - anchor.third).pow(2))
-                Measurement(anchor.first, anchor.second, anchor.third, dist, 0.01)
+                Measurement(anchor.first, anchor.second, anchor.third, dist, 0.5)
             }
             filter.update(measurements)
         }
 
-        // 2. Movement: simulate walking to learn the heading offset
-        for (stepNum in 1..50) {
-            filter.predict(step = 1.0, phoneAzimuth = phoneAzimuth, variance = 0.01)
+        // 2. Movement: simulate walking
+        for (stepNum in 1..20) {
+            filter.predict(step = 1.0, phoneAzimuth = phoneAzimuth, variance = 0.1)
             
-            val walkingDir = phoneAzimuth + trueHeadingOffset
-            currentX += 1.0 * cos(walkingDir)
-            currentY += 1.0 * sin(walkingDir)
+            currentX += 1.0 * cos(phoneAzimuth)
+            currentY += 1.0 * sin(phoneAzimuth)
             
             val measurements = anchors.map { anchor ->
                 val dist = sqrt((currentX - anchor.first).pow(2) + (currentY - anchor.second).pow(2) + (trueZ - anchor.third).pow(2))
-                Measurement(anchor.first, anchor.second, anchor.third, dist, 0.01)
+                Measurement(anchor.first, anchor.second, anchor.third, dist, 0.5)
             }
             filter.update(measurements)
         }
@@ -58,9 +55,6 @@ class ParticleFilterTest {
         
         assertEquals("X should converge", currentX, estimate.x, 5.0)
         assertEquals("Y should converge", currentY, estimate.y, 5.0)
-        
-        val angleDiff = Math.atan2(sin(estimate.headingOffset - trueHeadingOffset), cos(estimate.headingOffset - trueHeadingOffset))
-        assertTrue("Heading offset should converge (true=$trueHeadingOffset, est=${estimate.headingOffset}, diff=$angleDiff)", Math.abs(angleDiff) < 0.5)
     }
 
     @Test

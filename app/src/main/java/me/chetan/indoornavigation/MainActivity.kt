@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding)
                             .fillMaxSize()
                     ) {
-                        MainScreen(viewModel.devices, viewModel.userLocation.value)
+                        MainScreen(viewModel)
                     }
                 }
             }

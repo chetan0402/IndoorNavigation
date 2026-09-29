@@ -35,20 +35,58 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.PathFind
 import me.chetan.indoornavigation.data.DeviceScanInfo
 import me.chetan.indoornavigation.data.FilterEstimate
 import me.chetan.indoornavigation.data.GeoLocation
 import me.chetan.indoornavigation.data.NAV_GRAPH
 import me.chetan.indoornavigation.ui.components.BLEContainer
+import me.chetan.indoornavigation.ui.components.DebugContainer
 import me.chetan.indoornavigation.ui.components.RouteDisplay
 import me.chetan.indoornavigation.ui.components.RouteGraph
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen(viewModel: MainViewModel) {
+    MainScreen(
+        devices = viewModel.devices,
+        userEstimate = viewModel.userLocation.value,
+        isDebugEnabled = viewModel.isDebugModeEnabled.value,
+        onToggleDebug = { viewModel.toggleDebugMode() },
+        particleFilterDebugInfo = viewModel.particleFilterDebugInfo.value,
+        stepCount = viewModel.stepCount.value,
+        lastStepTimestamp = viewModel.lastStepTimestamp.value,
+        lastStepLength = viewModel.lastStepLength.value,
+        isStepSensorAvailable = viewModel.isStepSensorAvailable.value,
+        azimuthDegrees = viewModel.azimuthDegrees.value,
+        azimuthRadians = viewModel.azimuthRadians.value,
+        isRotationSensorAvailable = viewModel.isRotationSensorAvailable.value,
+        bleUpdateCount = viewModel.bleUpdateCount.value,
+        lastBleUpdateTimestamp = viewModel.lastBleUpdateTimestamp.value
+    )
+}
+
 @SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(devices: Map<String, DeviceScanInfo>, userEstimate: FilterEstimate) {
+fun MainScreen(
+    devices: Map<String, DeviceScanInfo>,
+    userEstimate: FilterEstimate,
+    isDebugEnabled: Boolean = false,
+    onToggleDebug: (Boolean) -> Unit = {},
+    particleFilterDebugInfo: ParticleFilterDebugInfo? = null,
+    stepCount: Int = 0,
+    lastStepTimestamp: Long = 0L,
+    lastStepLength: Double = 0.7,
+    isStepSensorAvailable: Boolean = false,
+    azimuthDegrees: Double = 0.0,
+    azimuthRadians: Double = 0.0,
+    isRotationSensorAvailable: Boolean = false,
+    bleUpdateCount: Int = 0,
+    lastBleUpdateTimestamp: Long = 0L
+) {
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
     var selectedDestination by remember { mutableStateOf<GeoLocation?>(null) }
@@ -146,6 +184,23 @@ fun MainScreen(devices: Map<String, DeviceScanInfo>, userEstimate: FilterEstimat
                 Spacer(modifier = Modifier.height(16.dp))
                 RouteGraph(NAV_GRAPH, it, currentLocation)
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            DebugContainer(
+                isDebugEnabled = isDebugEnabled,
+                onToggleDebug = onToggleDebug,
+                particleFilterDebugInfo = particleFilterDebugInfo,
+                userEstimate = userEstimate,
+                stepCount = stepCount,
+                lastStepTimestamp = lastStepTimestamp,
+                lastStepLength = lastStepLength,
+                isStepSensorAvailable = isStepSensorAvailable,
+                azimuthDegrees = azimuthDegrees,
+                azimuthRadians = azimuthRadians,
+                isRotationSensorAvailable = isRotationSensorAvailable,
+                bleUpdateCount = bleUpdateCount,
+                lastBleUpdateTimestamp = lastBleUpdateTimestamp
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
             BLEContainer(devices)

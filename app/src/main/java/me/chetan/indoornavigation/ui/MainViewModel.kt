@@ -19,6 +19,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.chetan.indoornavigation.ParticleFilter
+import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.RSSIDistancePredictor
 import me.chetan.indoornavigation.data.ANCHORS
 import me.chetan.indoornavigation.data.DeviceScanInfo
@@ -29,8 +30,21 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class MainViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
     val devices = mutableStateMapOf<String, DeviceScanInfo>()
-    val userLocation = mutableStateOf(FilterEstimate(0.0, 0.0, 0.0, 0.0))
+    val userLocation = mutableStateOf(FilterEstimate(0.0, 0.0, 0.0))
     
+    // Debug & Telemetry State
+    val isDebugModeEnabled = mutableStateOf(false)
+    val particleFilterDebugInfo = mutableStateOf<ParticleFilterDebugInfo?>(null)
+    val stepCount = mutableStateOf(0)
+    val lastStepTimestamp = mutableStateOf(0L)
+    val lastStepLength = mutableStateOf(0.7)
+    val azimuthDegrees = mutableStateOf(0.0)
+    val azimuthRadians = mutableStateOf(0.0)
+    val isStepSensorAvailable = mutableStateOf(false)
+    val isRotationSensorAvailable = mutableStateOf(false)
+    val bleUpdateCount = mutableStateOf(0)
+    val lastBleUpdateTimestamp = mutableStateOf(0L)
+
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
     private val particleFilter = ParticleFilter()
@@ -48,6 +62,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
         val bluetoothManager = application.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         scanner = bluetoothManager.adapter?.bluetoothLeScanner
         
+        isStepSensorAvailable.value = (stepSensor != null)
+        isRotationSensorAvailable.value = (rotationSensor != null)
+
         // Initialize bounds based on anchors
         val xCoords = ANCHORS.values.map { it.long }
         val yCoords = ANCHORS.values.map { it.lat }
@@ -62,6 +79,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
             zMax = (zCoords.maxOrNull() ?: 0.0) + 2.0
         )
 
+        particleFilterDebugInfo.value = particleFilter.getDebugInfo()
         startCleanupTask()
         registerSensors()
     }
@@ -80,21 +98,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
         }
     }
 
+    fun toggleDebugMode() {
+        isDebugModeEnabled.value = !isDebugModeEnabled.value
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> {
                 // Step detected: predict movement
-                // Assuming average step length is 0.7m
+                stepCount.value++
+                lastStepTimestamp.value = System.currentTimeMillis()
                 particleFilter.predict(step = 0.7, phoneAzimuth = currentDirection, variance = 0.05)
                 userLocation.value = particleFilter.estimate()
-                Log.d("Sensor", "Step detected! Moving user 0.7m at azimuth $currentDirection")
+                particleFilterDebugInfo.value = particleFilter.getDebugInfo()
+                Log.d("Sensor", "Step detected! Step count: ${stepCount.value}, Azimuth: $currentDirection")
             }
             Sensor.TYPE_ROTATION_VECTOR -> {
                 val rotationMatrix = FloatArray(9)
                 SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
                 val orientation = FloatArray(3)
                 SensorManager.getOrientation(rotationMatrix, orientation)
-                currentDirection = orientation[0].toDouble() // Azimuth (yaw)
+                currentDirection = orientation[0].toDouble() // Azimuth (yaw) in radians
+                azimuthRadians.value = currentDirection
+                var deg = Math.toDegrees(currentDirection)
+                if (deg < 0) deg += 360.0
+                azimuthDegrees.value = deg
             }
         }
     }
@@ -127,7 +155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 
                 val currentInfo = devices[address]
                 val predictor = currentInfo?.predictor ?: RSSIDistancePredictor()
-                val (dis, confidence) = predictor.predict(result.rssi.toDouble())
+                val dis = predictor.predict(result.rssi.toDouble())
                 
                 devices[address] = DeviceScanInfo(dis, predictor, System.currentTimeMillis())
                 
@@ -138,7 +166,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     y = anchor.lat,
                     z = anchor.alt,
                     radius = dis,
-                    variance = 1.0 / (confidence + 0.1)
+                    variance = 5.0
                 )
 
                 val currentTime = System.currentTimeMillis()
@@ -146,7 +174,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     particleFilter.update(measurementBuffer.values.toList())
                     measurementBuffer.clear()
                     lastUpdateTimestamp = currentTime
+                    bleUpdateCount.value++
+                    lastBleUpdateTimestamp.value = currentTime
                     userLocation.value = particleFilter.estimate()
+                    particleFilterDebugInfo.value = particleFilter.getDebugInfo()
                 }
             }
             override fun onScanFailed(errorCode: Int) {
