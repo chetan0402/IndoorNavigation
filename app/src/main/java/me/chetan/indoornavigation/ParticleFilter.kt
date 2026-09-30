@@ -32,29 +32,33 @@ class ParticleFilter(private val numParticles: Int = 1000) {
     private var particles = mutableListOf<Particle>()
     private val random = Random()
 
-    private var xMin = -100.0
-    private var xMax = 100.0
-    private var yMin = -100.0
-    private var yMax = 100.0
-    private var zMin = -100.0
-    private var zMax = 100.0
+    private var xMin = -Double.MAX_VALUE
+    private var xMax = Double.MAX_VALUE
+    private var yMin = -Double.MAX_VALUE
+    private var yMax = Double.MAX_VALUE
+    private var zMin = -Double.MAX_VALUE
+    private var zMax = Double.MAX_VALUE
 
     init {
-        initializeParticles()
+        initializeParticles(0.0,0.0,0.0)
     }
 
-    private fun initializeParticles() {
+    private fun initializeParticles(x: Double, y: Double, z: Double) {
         particles.clear()
         for (i in 0 until numParticles) {
             particles.add(
                 Particle(
-                    x = -2 + random.nextDouble() * 4,
-                    y = -2 + random.nextDouble() * 4,
-                    z = -2 + random.nextDouble() * 4,
+                    x = x + random.nextGaussian(),
+                    y = y + random.nextGaussian(),
+                    z = z + random.nextGaussian(),
                     weight = 1.0 / numParticles
                 )
             )
         }
+    }
+
+    fun absUpdate(x: Double, y: Double, z: Double){
+        initializeParticles(x,y,z)
     }
 
     /**
@@ -125,8 +129,7 @@ class ParticleFilter(private val numParticles: Int = 1000) {
             }
             resample()
         } else {
-            // If all particles died (out of bounds or weight collapse), re-initialize in new bounds
-            initializeParticles()
+            // All particles have died
         }
     }
 

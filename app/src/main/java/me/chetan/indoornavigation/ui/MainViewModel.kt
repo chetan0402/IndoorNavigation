@@ -12,6 +12,9 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Log
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
@@ -35,15 +38,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
     // Debug & Telemetry State
     val isDebugModeEnabled = mutableStateOf(false)
     val particleFilterDebugInfo = mutableStateOf<ParticleFilterDebugInfo?>(null)
-    val stepCount = mutableStateOf(0)
-    val lastStepTimestamp = mutableStateOf(0L)
-    val lastStepLength = mutableStateOf(0.7)
-    val azimuthDegrees = mutableStateOf(0.0)
-    val azimuthRadians = mutableStateOf(0.0)
+    val stepCount = mutableIntStateOf(0)
+    val lastStepTimestamp = mutableLongStateOf(0L)
+    val lastStepLength = mutableDoubleStateOf(0.7)
+    val azimuthDegrees = mutableDoubleStateOf(0.0)
+    val azimuthRadians = mutableDoubleStateOf(0.0)
     val isStepSensorAvailable = mutableStateOf(false)
     val isRotationSensorAvailable = mutableStateOf(false)
-    val bleUpdateCount = mutableStateOf(0)
-    val lastBleUpdateTimestamp = mutableStateOf(0L)
+    val bleUpdateCount = mutableIntStateOf(0)
+    val lastBleUpdateTimestamp = mutableLongStateOf(0L)
 
     private var scanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
@@ -102,16 +105,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
         isDebugModeEnabled.value = !isDebugModeEnabled.value
     }
 
+    fun absUpdate(x: Double, y: Double, z: Double) {
+        particleFilter.absUpdate(x, y, z)
+        userLocation.value = particleFilter.estimate()
+        particleFilterDebugInfo.value = particleFilter.getDebugInfo()
+        Log.d("ParticleFilter", "Absolute update from QR code: x=$x, y=$y, z=$z")
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> {
                 // Step detected: predict movement
-                stepCount.value++
-                lastStepTimestamp.value = System.currentTimeMillis()
+                stepCount.intValue++
+                lastStepTimestamp.longValue = System.currentTimeMillis()
                 particleFilter.predict(step = 0.7, phoneAzimuth = currentDirection, variance = 0.05)
                 userLocation.value = particleFilter.estimate()
                 particleFilterDebugInfo.value = particleFilter.getDebugInfo()
-                Log.d("Sensor", "Step detected! Step count: ${stepCount.value}, Azimuth: $currentDirection")
+                Log.d("Sensor", "Step detected! Step count: ${stepCount.intValue}, Azimuth: $currentDirection")
             }
             Sensor.TYPE_ROTATION_VECTOR -> {
                 val rotationMatrix = FloatArray(9)
@@ -119,10 +129,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 val orientation = FloatArray(3)
                 SensorManager.getOrientation(rotationMatrix, orientation)
                 currentDirection = orientation[0].toDouble() // Azimuth (yaw) in radians
-                azimuthRadians.value = currentDirection
+                azimuthRadians.doubleValue = currentDirection
                 var deg = Math.toDegrees(currentDirection)
                 if (deg < 0) deg += 360.0
-                azimuthDegrees.value = deg
+                azimuthDegrees.doubleValue = deg
             }
         }
     }
@@ -174,8 +184,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     particleFilter.update(measurementBuffer.values.toList())
                     measurementBuffer.clear()
                     lastUpdateTimestamp = currentTime
-                    bleUpdateCount.value++
-                    lastBleUpdateTimestamp.value = currentTime
+                    bleUpdateCount.intValue++
+                    lastBleUpdateTimestamp.longValue = currentTime
                     userLocation.value = particleFilter.estimate()
                     particleFilterDebugInfo.value = particleFilter.getDebugInfo()
                 }

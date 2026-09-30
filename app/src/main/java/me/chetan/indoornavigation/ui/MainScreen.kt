@@ -32,9 +32,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.util.Log
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.Button
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.PathFind
 import me.chetan.indoornavigation.data.DeviceScanInfo
@@ -64,7 +69,8 @@ fun MainScreen(viewModel: MainViewModel) {
         azimuthRadians = viewModel.azimuthRadians.value,
         isRotationSensorAvailable = viewModel.isRotationSensorAvailable.value,
         bleUpdateCount = viewModel.bleUpdateCount.value,
-        lastBleUpdateTimestamp = viewModel.lastBleUpdateTimestamp.value
+        lastBleUpdateTimestamp = viewModel.lastBleUpdateTimestamp.value,
+        onAbsUpdate = { x, y, z -> viewModel.absUpdate(x, y, z) }
     )
 }
 
@@ -85,7 +91,8 @@ fun MainScreen(
     azimuthRadians: Double = 0.0,
     isRotationSensorAvailable: Boolean = false,
     bleUpdateCount: Int = 0,
-    lastBleUpdateTimestamp: Long = 0L
+    lastBleUpdateTimestamp: Long = 0L,
+    onAbsUpdate: (Double, Double, Double) -> Unit = { _, _, _ -> }
 ) {
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
@@ -156,7 +163,9 @@ fun MainScreen(
                 )
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -165,7 +174,7 @@ fun MainScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Your Location",
                             style = MaterialTheme.typography.labelMedium
@@ -174,6 +183,35 @@ fun MainScreen(
                             text = "(${String.format(Locale.US, "%.2f", currentLocation.long)}, ${String.format(Locale.US, "%.2f", currentLocation.lat)})",
                             style = MaterialTheme.typography.bodyLarge
                         )
+                    }
+
+                    val context = LocalContext.current
+                    val scanner = remember { GmsBarcodeScanning.getClient(context) }
+
+                    Button(
+                        onClick = {
+                            scanner.startScan()
+                                .addOnSuccessListener { barcode ->
+                                    barcode.rawValue?.let { rawValue ->
+                                        val parts = rawValue.split(",")
+                                        if (parts.size >= 3) {
+                                            val x = parts[0].trim().toDoubleOrNull()
+                                            val y = parts[1].trim().toDoubleOrNull()
+                                            val z = parts[2].trim().toDoubleOrNull()
+                                            if (x != null && y != null && z != null) {
+                                                onAbsUpdate(x, y, z)
+                                            }
+                                        }
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("QRScan", "Barcode scanner error", e)
+                                }
+                        }
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Scan")
                     }
                 }
             }
