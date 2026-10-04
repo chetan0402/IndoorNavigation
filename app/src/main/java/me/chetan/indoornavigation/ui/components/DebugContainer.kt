@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.data.FilterEstimate
+import me.chetan.indoornavigation.data.GeoLocation
+import me.chetan.indoornavigation.data.NAV_GRAPH
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,7 +54,9 @@ fun DebugContainer(
     azimuthRadians: Double,
     isRotationSensorAvailable: Boolean,
     bleUpdateCount: Int,
-    lastBleUpdateTimestamp: Long
+    lastBleUpdateTimestamp: Long,
+    route: List<GeoLocation> = emptyList(),
+    currentLocation: GeoLocation? = null
 ) {
     Card(
         modifier = Modifier
@@ -93,6 +98,20 @@ fun DebugContainer(
             ) {
                 Column {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                    // 0. Graph & Route Visualization
+                    DebugSectionHeader(
+                        title = "Raw Graph & Route Visualization",
+                        icon = Icons.Default.Place
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    RouteGraph(
+                        graph = NAV_GRAPH,
+                        route = route,
+                        currentLocation = currentLocation
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // 1. Step Input & Motion Sensor Info
                     DebugSectionHeader(

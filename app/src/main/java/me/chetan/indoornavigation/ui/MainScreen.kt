@@ -1,6 +1,7 @@
 package me.chetan.indoornavigation.ui
 
 import android.annotation.SuppressLint
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +18,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,13 +35,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import android.util.Log
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.Button
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.PathFind
@@ -49,7 +49,6 @@ import me.chetan.indoornavigation.data.NAV_GRAPH
 import me.chetan.indoornavigation.ui.components.BLEContainer
 import me.chetan.indoornavigation.ui.components.DebugContainer
 import me.chetan.indoornavigation.ui.components.RouteDisplay
-import me.chetan.indoornavigation.ui.components.RouteGraph
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,15 +60,15 @@ fun MainScreen(viewModel: MainViewModel) {
         isDebugEnabled = viewModel.isDebugModeEnabled.value,
         onToggleDebug = { viewModel.toggleDebugMode() },
         particleFilterDebugInfo = viewModel.particleFilterDebugInfo.value,
-        stepCount = viewModel.stepCount.value,
-        lastStepTimestamp = viewModel.lastStepTimestamp.value,
-        lastStepLength = viewModel.lastStepLength.value,
+        stepCount = viewModel.stepCount.intValue,
+        lastStepTimestamp = viewModel.lastStepTimestamp.longValue,
+        lastStepLength = viewModel.lastStepLength.doubleValue,
         isStepSensorAvailable = viewModel.isStepSensorAvailable.value,
-        azimuthDegrees = viewModel.azimuthDegrees.value,
-        azimuthRadians = viewModel.azimuthRadians.value,
+        azimuthDegrees = viewModel.azimuthDegrees.doubleValue,
+        azimuthRadians = viewModel.azimuthRadians.doubleValue,
         isRotationSensorAvailable = viewModel.isRotationSensorAvailable.value,
-        bleUpdateCount = viewModel.bleUpdateCount.value,
-        lastBleUpdateTimestamp = viewModel.lastBleUpdateTimestamp.value,
+        bleUpdateCount = viewModel.bleUpdateCount.intValue,
+        lastBleUpdateTimestamp = viewModel.lastBleUpdateTimestamp.longValue,
         onAbsUpdate = { x, y, z -> viewModel.absUpdate(x, y, z) }
     )
 }
@@ -219,8 +218,6 @@ fun MainScreen(
             route?.let {
                 Spacer(modifier = Modifier.height(16.dp))
                 RouteDisplay(it)
-                Spacer(modifier = Modifier.height(16.dp))
-                RouteGraph(NAV_GRAPH, it, currentLocation)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -237,7 +234,9 @@ fun MainScreen(
                 azimuthRadians = azimuthRadians,
                 isRotationSensorAvailable = isRotationSensorAvailable,
                 bleUpdateCount = bleUpdateCount,
-                lastBleUpdateTimestamp = lastBleUpdateTimestamp
+                lastBleUpdateTimestamp = lastBleUpdateTimestamp,
+                route = route ?: emptyList(),
+                currentLocation = currentLocation
             )
 
             Spacer(modifier = Modifier.height(16.dp))

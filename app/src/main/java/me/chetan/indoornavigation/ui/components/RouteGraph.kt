@@ -17,7 +17,7 @@ import me.chetan.indoornavigation.data.GeoLocation
 @Composable
 fun RouteGraph(
     graph: Map<GeoLocation, List<GeoLocation>>,
-    route: List<GeoLocation>,
+    route: List<GeoLocation> = emptyList(),
     currentLocation: GeoLocation? = null
 ) {
     val allPoints = graph.keys + graph.values.flatten() + route + listOfNotNull(currentLocation)
@@ -92,16 +92,18 @@ fun RouteGraph(
             )
         }
 
-        drawCircle(
-            color = secondaryColor,
-            radius = 14f,
-            center = route.last().toOffset()
-        )
+        if (route.isNotEmpty()) {
+            drawCircle(
+                color = secondaryColor,
+                radius = 14f,
+                center = route.last().toOffset()
+            )
 
-        drawCircle(
-            color = Color(0xFFF44336), // Red
-            radius = 14f,
-            center = route.first().toOffset()
-        )
+            drawCircle(
+                color = Color(0xFFF44336), // Red
+                radius = 14f,
+                center = route.first().toOffset()
+            )
+        }
     }
 }
