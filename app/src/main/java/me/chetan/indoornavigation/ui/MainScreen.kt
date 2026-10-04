@@ -217,7 +217,7 @@ fun MainScreen(
 
             route?.let {
                 Spacer(modifier = Modifier.height(16.dp))
-                RouteDisplay(it)
+                RouteDisplay(route = it, currentLocation = currentLocation)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
