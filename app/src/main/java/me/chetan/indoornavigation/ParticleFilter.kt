@@ -75,16 +75,17 @@ class ParticleFilter(private val numParticles: Int = 1000) {
     }
 
     /**
-     * Prediction step: Moves particles based on step length and direction with noise.
-     * Incorporates the particle's internal heading offset.
+     * Prediction step: Moves particles based on step length and a random direction,
+     * totally ignoring phone azimuth (yaw).
      */
-    fun predict(step: Double, phoneAzimuth: Double, variance: Double) {
+    fun predict(step: Double, variance: Double) {
         val std = sqrt(variance)
         for (particle in particles) {
             val noisyStep = step + random.nextGaussian() * std
+            val randomDirection = random.nextDouble() * 2.0 * PI
 
-            particle.x += noisyStep * cos(phoneAzimuth)
-            particle.y += noisyStep * sin(phoneAzimuth)
+            particle.x += noisyStep * cos(randomDirection)
+            particle.y += noisyStep * sin(randomDirection)
             particle.z += random.nextGaussian() * 0.05
         }
     }

@@ -41,10 +41,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
     val stepCount = mutableIntStateOf(0)
     val lastStepTimestamp = mutableLongStateOf(0L)
     val lastStepLength = mutableDoubleStateOf(0.7)
-    val azimuthDegrees = mutableDoubleStateOf(0.0)
-    val azimuthRadians = mutableDoubleStateOf(0.0)
     val isStepSensorAvailable = mutableStateOf(false)
-    val isRotationSensorAvailable = mutableStateOf(false)
     val bleUpdateCount = mutableIntStateOf(0)
     val lastBleUpdateTimestamp = mutableLongStateOf(0L)
 
@@ -57,16 +54,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
-    private var rotationSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-    
-    private var currentDirection = 0.0
 
     init {
         val bluetoothManager = application.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         scanner = bluetoothManager.adapter?.bluetoothLeScanner
         
         isStepSensorAvailable.value = (stepSensor != null)
-        isRotationSensorAvailable.value = (rotationSensor != null)
 
         // Initialize bounds based on anchors
         val xCoords = ANCHORS.values.map { it.long }
@@ -93,12 +86,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
         } else {
             sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_FASTEST)
         }
-        
-        if (rotationSensor == null) {
-            Log.e("Sensor", "Rotation Vector sensor not available on this device")
-        } else {
-            sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_FASTEST)
-        }
     }
 
     fun toggleDebugMode() {
@@ -118,21 +105,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 // Step detected: predict movement
                 stepCount.intValue++
                 lastStepTimestamp.longValue = System.currentTimeMillis()
-                particleFilter.predict(step = 0.7, phoneAzimuth = currentDirection, variance = 0.05)
+                particleFilter.predict(step = 0.7, variance = 0.05)
                 userLocation.value = particleFilter.estimate()
                 particleFilterDebugInfo.value = particleFilter.getDebugInfo()
-                Log.d("Sensor", "Step detected! Step count: ${stepCount.intValue}, Azimuth: $currentDirection")
-            }
-            Sensor.TYPE_ROTATION_VECTOR -> {
-                val rotationMatrix = FloatArray(9)
-                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                val orientation = FloatArray(3)
-                SensorManager.getOrientation(rotationMatrix, orientation)
-                currentDirection = orientation[0].toDouble() // Azimuth (yaw) in radians
-                azimuthRadians.doubleValue = currentDirection
-                var deg = Math.toDegrees(currentDirection)
-                if (deg < 0) deg += 360.0
-                azimuthDegrees.doubleValue = deg
+                Log.d("Sensor", "Step detected! Step count: ${stepCount.intValue}")
             }
         }
     }
@@ -181,7 +157,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastUpdateTimestamp > updateIntervalMs) {
-                    particleFilter.update(measurementBuffer.values.toList())
+                    val closestMeasurements = measurementBuffer.values.sortedBy { it.radius }.take(2)
+                    if (closestMeasurements.isNotEmpty()) {
+                        particleFilter.update(closestMeasurements)
+                    }
                     measurementBuffer.clear()
                     lastUpdateTimestamp = currentTime
                     bleUpdateCount.intValue++

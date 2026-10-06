@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
@@ -50,9 +49,6 @@ fun DebugContainer(
     lastStepTimestamp: Long,
     lastStepLength: Double,
     isStepSensorAvailable: Boolean,
-    azimuthDegrees: Double,
-    azimuthRadians: Double,
-    isRotationSensorAvailable: Boolean,
     bleUpdateCount: Int,
     lastBleUpdateTimestamp: Long,
     route: List<GeoLocation> = emptyList(),
@@ -133,26 +129,6 @@ fun DebugContainer(
                     DebugRow(
                         label = "Last Step Time",
                         value = formatTimestamp(lastStepTimestamp)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 2. Azimuth & Direction Info
-                    DebugSectionHeader(
-                        title = "Azimuth & Orientation",
-                        icon = Icons.Default.LocationOn
-                    )
-                    DebugRow(
-                        label = "Rotation Vector Sensor",
-                        value = if (isRotationSensorAvailable) "Active / Available" else "Unavailable"
-                    )
-                    DebugRow(
-                        label = "Azimuth Degrees",
-                        value = String.format(Locale.US, "%.1f° (%s)", azimuthDegrees, getCardinalDirection(azimuthDegrees))
-                    )
-                    DebugRow(
-                        label = "Azimuth Radians",
-                        value = String.format(Locale.US, "%.3f rad", azimuthRadians)
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -279,10 +255,4 @@ private fun formatTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return "N/A"
     val sdf = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     return sdf.format(Date(timestamp))
-}
-
-private fun getCardinalDirection(degrees: Double): String {
-    val directions = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
-    val index = (((degrees % 360 + 360) % 360) / 22.5 + 0.5).toInt() % 16
-    return directions[index]
 }

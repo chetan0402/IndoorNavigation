@@ -4,9 +4,7 @@ import me.chetan.indoornavigation.data.Measurement
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.cos
 import kotlin.math.pow
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 class ParticleFilterTest {
@@ -16,7 +14,6 @@ class ParticleFilterTest {
         val filter = ParticleFilter(numParticles = 5000)
         filter.setBounds(0.0, 0.0, 0.0, 100.0, 100.0, 2.0)
         
-        val phoneAzimuth = 0.0 // Walking in +X direction
         var currentX = 10.0
         var currentY = 10.0
         val trueZ = 0.5
@@ -39,10 +36,10 @@ class ParticleFilterTest {
 
         // 2. Movement: simulate walking
         for (stepNum in 1..20) {
-            filter.predict(step = 1.0, phoneAzimuth = phoneAzimuth, variance = 0.1)
+            filter.predict(step = 1.0, variance = 0.1)
             
-            currentX += 1.0 * cos(phoneAzimuth)
-            currentY += 1.0 * sin(phoneAzimuth)
+            currentX += 1.0
+            currentY += 0.0
             
             val measurements = anchors.map { anchor ->
                 val dist = sqrt((currentX - anchor.first).pow(2) + (currentY - anchor.second).pow(2) + (trueZ - anchor.third).pow(2))
@@ -64,7 +61,7 @@ class ParticleFilterTest {
         filter.setBounds(0.0, 0.0, 0.0, 10.0, 10.0, 1.0)
         
         // Move particles partially out of bounds
-        filter.predict(step = 15.0, phoneAzimuth = 0.0, variance = 0.0)
+        filter.predict(step = 15.0, variance = 0.0)
         
         // Update with a measurement. Particles at X=15 are out of bounds [0, 10]
         // Weight sum will be 0, triggering re-initialization within [0, 10]
@@ -102,7 +99,7 @@ class ParticleFilterTest {
         // Perform batch updates
         for (i in 1..300) {
             // Predict with zero motion but variance to help exploration
-            filter.predict(step = 0.0, phoneAzimuth = 0.0, variance = 0.5)
+            filter.predict(step = 0.0, variance = 0.5)
             filter.update(measurements)
         }
 
@@ -131,7 +128,7 @@ class ParticleFilterTest {
         
         for (iteration in 1..200) {
             // Predict with zero motion but variance to help exploration
-            filter.predict(step = 0.0, phoneAzimuth = 0.0, variance = 0.5)
+            filter.predict(step = 0.0, variance = 0.5)
             for (anchor in anchors) {
                 val dist = sqrt(
                     (targetX - anchor.first).pow(2.0) +
