@@ -1,5 +1,6 @@
 [versions]
 agp = "9.4.1"
+json = "20260814"
 kotlin = "2.4.20"
 coreKtx = "1.19.1"
 junit = "4.13.2"
@@ -12,6 +13,7 @@ playServicesCodeScanner = "16.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+json = { module = "org.json:json", version.ref = "json" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
