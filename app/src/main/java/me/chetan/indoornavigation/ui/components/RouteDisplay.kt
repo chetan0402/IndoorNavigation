@@ -27,12 +27,9 @@ import androidx.compose.material.icons.filled.TurnLeft
 import androidx.compose.material.icons.filled.TurnRight
 import androidx.compose.material.icons.filled.TurnSlightLeft
 import androidx.compose.material.icons.filled.TurnSlightRight
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,6 +46,8 @@ import me.chetan.indoornavigation.RouteInstructionGenerator
 import me.chetan.indoornavigation.data.GeoLocation
 import me.chetan.indoornavigation.data.RouteStep
 import me.chetan.indoornavigation.data.RouteStepType
+import me.chetan.indoornavigation.distance_between_point
+import me.chetan.indoornavigation.interpolate_onto_line
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -68,6 +67,21 @@ fun RouteDisplay(
     }
 
     val activeStep = routeSteps.getOrElse(activeStepIndex) { routeSteps.first() }
+    val projectedLocation = remember(currentLocation, activeStep) {
+        if (currentLocation != null && activeStep.type != RouteStepType.ARRIVE) {
+            interpolate_onto_line(currentLocation, activeStep.startPoint, activeStep.endPoint)
+        } else null
+    }
+
+    val activeStepRemainingDistance = remember(projectedLocation, activeStep, currentLocation) {
+        if (projectedLocation != null) {
+            distance_between_point(projectedLocation, activeStep.endPoint)
+        } else {
+            activeStep.distanceMeters
+        }
+    }
+    val isNextStepHighlighted = activeStepRemainingDistance < 5.0 && activeStep.type != RouteStepType.ARRIVE
+
     val totalDistance = remember(routeSteps) {
         routeSteps.filter { it.type != RouteStepType.ARRIVE }.sumOf { it.distanceMeters }
     }
@@ -78,74 +92,7 @@ fun RouteDisplay(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            
-            // Active Step Hero Banner
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = getStepIcon(activeStep.type),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "CURRENT STEP (${activeStepIndex + 1}/${routeSteps.size})",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = activeStep.instructionText,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val progress = if (routeSteps.isNotEmpty()) {
-                        (activeStepIndex + 1).toFloat() / routeSteps.size.toFloat()
-                    } else 0f
-
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(CircleShape),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Overall Summary
+            // Header Title & Total Distance Summary
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -154,41 +101,44 @@ fun RouteDisplay(
                     imageVector = Icons.Default.Navigation,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Total distance: ${String.format(Locale.US, "%.1f", totalDistance)} m (~$totalEstSteps steps)",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column {
+                    Text(
+                        text = "Detailed Route Instructions",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Total distance: ${String.format(Locale.US, "%.1f", totalDistance)} m (~$totalEstSteps steps)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             // Step Timeline List
-            Text(
-                text = "Detailed Route Instructions",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
+                    .height(300.dp)
             ) {
                 itemsIndexed(routeSteps) { index, step ->
                     val isCompleted = index < activeStepIndex
                     val isActive = index == activeStepIndex
+                    val isNextHighlighted = isNextStepHighlighted && (index == activeStepIndex + 1)
                     val isLast = index == routeSteps.lastIndex
 
                     StepTimelineItem(
                         step = step,
                         isCompleted = isCompleted,
                         isActive = isActive,
+                        isNextHighlighted = isNextHighlighted,
+                        remainingMeters = if (isActive && currentLocation != null) activeStepRemainingDistance else null,
                         isLast = isLast
                     )
                 }
@@ -202,8 +152,12 @@ private fun StepTimelineItem(
     step: RouteStep,
     isCompleted: Boolean,
     isActive: Boolean,
+    isNextHighlighted: Boolean,
+    remainingMeters: Double? = null,
     isLast: Boolean
 ) {
+    val isHighlighted = isActive || isNextHighlighted
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -243,6 +197,21 @@ private fun StepTimelineItem(
                             )
                         }
                     }
+                    isNextHighlighted -> {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                            )
+                        }
+                    }
                     else -> {
                         Box(
                             modifier = Modifier
@@ -263,8 +232,10 @@ private fun StepTimelineItem(
                         .width(2.dp)
                         .fillMaxHeight()
                         .background(
-                            if (isCompleted) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                            when {
+                                isCompleted || (isActive && isNextHighlighted) -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                            }
                         )
                 )
             }
@@ -280,8 +251,8 @@ private fun StepTimelineItem(
                 .clip(RoundedCornerShape(12.dp))
                 .background(
                     when {
-                        isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                        isCompleted -> Color.Transparent
+                        isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        isNextHighlighted -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                         else -> Color.Transparent
                     }
                 )
@@ -292,7 +263,7 @@ private fun StepTimelineItem(
                     imageVector = getStepIcon(step.type),
                     contentDescription = null,
                     tint = when {
-                        isActive -> MaterialTheme.colorScheme.primary
+                        isHighlighted -> MaterialTheme.colorScheme.primary
                         isCompleted -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         else -> MaterialTheme.colorScheme.onSurface
                     },
@@ -301,17 +272,42 @@ private fun StepTimelineItem(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = step.instructionText,
-                        style = if (isActive) MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        style = if (isHighlighted) MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                         else MaterialTheme.typography.bodyMedium,
                         color = when {
-                            isActive -> MaterialTheme.colorScheme.onSurface
+                            isHighlighted -> MaterialTheme.colorScheme.onSurface
                             isCompleted -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             else -> MaterialTheme.colorScheme.onSurface
                         }
                     )
+
+                    if (isActive && remainingMeters != null && step.type != RouteStepType.ARRIVE) {
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", remainingMeters)} m remaining",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (isNextHighlighted) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Text(
+                            text = "NEXT",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
         }
