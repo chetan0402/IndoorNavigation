@@ -105,13 +105,13 @@ class ParticleFilterMetric {
 
         val distances = mutableListOf<Pair<Double, Triple<Double, Double, Double>>>()
 
-        for (anchor in anchors) {
+        for ((_, value) in anchors) {
             val distance = sqrt(
-                (anchor.value.first - x).pow(2) +
-                        (anchor.value.second - y).pow(2) +
-                        (anchor.value.third - z).pow(2)
+                (value.first - x).pow(2) +
+                        (value.second - y).pow(2) +
+                        (value.third - z).pow(2)
             )
-            distances.add(Pair(distance, anchor.value))
+            distances.add(Pair(distance, value))
         }
 
         distances.sortBy { it.first }

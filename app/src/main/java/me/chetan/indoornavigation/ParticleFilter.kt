@@ -107,16 +107,16 @@ class ParticleFilter(private val numParticles: Int = 1000) {
             }
 
             var totalLogLikelihood = 0.0
-            for (m in measurements) {
+            for ((x, y, z, radius, variance) in measurements) {
                 val dist = sqrt(
-                    (particle.x - m.x).pow(2) +
-                            (particle.y - m.y).pow(2) +
-                            (particle.z - m.z).pow(2)
+                    (particle.x - x).pow(2) +
+                            (particle.y - y).pow(2) +
+                            (particle.z - z).pow(2)
                 )
 
-                val std = sqrt(m.variance)
+                val std = sqrt(variance)
                 // Use likelihood for weight update, handling multiple measurements via log-sum for stability
-                val likelihood = exp(-0.5 * ((dist - m.radius) / std).pow(2)) / (std * sqrt(2.0 * PI))
+                val likelihood = exp(-0.5 * ((dist - radius) / std).pow(2)) / (std * sqrt(2.0 * PI))
                 totalLogLikelihood += ln(likelihood.coerceAtLeast(1e-10))
             }
 
@@ -133,13 +133,6 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         } else {
             // All particles have died
         }
-    }
-
-    /**
-     * Original single update preserved for convenience, but calls batch update internally.
-     */
-    fun update(anchorX: Double, anchorY: Double, anchorZ: Double, measuredRadius: Double, variance: Double) {
-        update(listOf(Measurement(anchorX, anchorY, anchorZ, measuredRadius, variance)))
     }
 
     /**
@@ -185,12 +178,12 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         var z = 0.0
         var totalWeight = 0.0
         
-        for (p in particles) {
-            x += p.x * p.weight
-            y += p.y * p.weight
-            z += p.z * p.weight
+        for ((x1, y1, z1, weight) in particles) {
+            x += x1 * weight
+            y += y1 * weight
+            z += z1 * weight
             
-            totalWeight += p.weight
+            totalWeight += weight
         }
         
         return if (totalWeight > 0) {
@@ -236,20 +229,20 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         var maxW = 0.0
         var activeCount = 0
 
-        for (p in particles) {
-            if (p.weight > 0) {
+        for ((x, y, z, weight) in particles) {
+            if (weight > 0) {
                 activeCount++
             }
-            if (p.weight > maxW) {
-                maxW = p.weight
+            if (weight > maxW) {
+                maxW = weight
             }
-            val dx = p.x - estimate.x
-            val dy = p.y - estimate.y
-            val dz = p.z - estimate.z
-            varSumX += p.weight * dx * dx
-            varSumY += p.weight * dy * dy
-            varSumZ += p.weight * dz * dz
-            sumWeightSq += p.weight * p.weight
+            val dx = x - estimate.x
+            val dy = y - estimate.y
+            val dz = z - estimate.z
+            varSumX += weight * dx * dx
+            varSumY += weight * dy * dy
+            varSumZ += weight * dz * dz
+            sumWeightSq += weight * weight
         }
 
         val effectiveParticles = if (sumWeightSq > 0) 1.0 / sumWeightSq else 0.0

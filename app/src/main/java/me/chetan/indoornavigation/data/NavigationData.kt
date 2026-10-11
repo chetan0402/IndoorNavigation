@@ -1,9 +1,9 @@
 package me.chetan.indoornavigation.data
 
-val BLE66 = "2D:7E:1A:02:3D:21"
-val BLE67 = "55:6D:EA:22:2C:71"
-val BLE69 = "68:1A:9E:8C:E2:CB"
-val BLE70 = "25:B6:BE:A7:E6:47"
+const val BLE66 = "2D:7E:1A:02:3D:21"
+const val BLE67 = "55:6D:EA:22:2C:71"
+const val BLE69 = "68:1A:9E:8C:E2:CB"
+const val BLE70 = "25:B6:BE:A7:E6:47"
 
 val ANCHORS = mapOf(
     BLE66 to GeoLocation(0.0, 0.0, 0.0, "BLE1"),
