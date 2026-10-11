@@ -4,16 +4,10 @@ import kotlin.math.pow
 
 class RSSIDistancePredictor(
     private val alpha: Double = 0.2,
-    private val txPower: Double = -72.0,
-    private val pathLossExponent: Double = 2.4
+    private val txPower: Double = -68.0,
+    private val pathLossExponent: Double = 2.5
 ) {
     private var smoothedRssi: Double? = null
-
-    constructor(windowSize: Int, txPower: Double = -72.0, pathLossExponent: Double = 2.4) : this(
-        alpha = 2.0 / (windowSize + 1.0),
-        txPower = txPower,
-        pathLossExponent = pathLossExponent
-    )
 
     fun predict(newRssi: Double): Double {
         val current = smoothedRssi
