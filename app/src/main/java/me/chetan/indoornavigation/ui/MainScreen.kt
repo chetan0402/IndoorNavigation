@@ -51,7 +51,6 @@ import me.chetan.indoornavigation.ui.components.DebugContainer
 import me.chetan.indoornavigation.ui.components.RouteDisplay
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     MainScreen(
@@ -173,7 +172,7 @@ fun MainScreen(
                             style = MaterialTheme.typography.labelMedium
                         )
                         Text(
-                            text = "(${String.format(Locale.US, "%.2f", currentLocation.long)}, ${String.format(Locale.US, "%.2f", currentLocation.lat)})",
+                            text = "(${String.format(Locale.US, "%.2f", currentLocation.long)}, ${String.format(Locale.US, "%.2f", currentLocation.lat)}, ${String.format(Locale.US,"%.2f",currentLocation.alt)})",
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }

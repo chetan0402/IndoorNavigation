@@ -94,7 +94,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
     fun absUpdate(x: Double, y: Double, z: Double) {
         particleFilter.absUpdate(x, y, z)
-        userLocation.value = particleFilter.estimate()
+        userLocation.value = particleFilter.estimate(ANCHORS)
         particleFilterDebugInfo.value = particleFilter.getDebugInfo()
         Log.d("ParticleFilter", "Absolute update from QR code: x=$x, y=$y, z=$z")
     }
@@ -106,7 +106,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 stepCount.intValue++
                 lastStepTimestamp.longValue = System.currentTimeMillis()
                 particleFilter.predict(step = 0.7, variance = 0.05)
-                userLocation.value = particleFilter.estimate()
+                userLocation.value = particleFilter.estimate(ANCHORS)
                 particleFilterDebugInfo.value = particleFilter.getDebugInfo()
                 Log.d("Sensor", "Step detected! Step count: ${stepCount.intValue}")
             }
@@ -165,7 +165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     lastUpdateTimestamp = currentTime
                     bleUpdateCount.intValue++
                     lastBleUpdateTimestamp.longValue = currentTime
-                    userLocation.value = particleFilter.estimate()
+                    userLocation.value = particleFilter.estimate(ANCHORS)
                     particleFilterDebugInfo.value = particleFilter.getDebugInfo()
                 }
             }

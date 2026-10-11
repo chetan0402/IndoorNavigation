@@ -1,5 +1,6 @@
 package me.chetan.indoornavigation
 
+import me.chetan.indoornavigation.data.FilterEstimate
 import me.chetan.indoornavigation.data.GeoLocation
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -46,4 +47,40 @@ fun distance_between_point(point1: GeoLocation, point2: GeoLocation): Double{
     val dLat = point2.lat - point1.lat
     val dAlt = point2.alt - point1.alt
     return sqrt(dLong.pow(2.0) + dLat.pow(2.0) + dAlt.pow(2.0))
+}
+
+fun interpolate(pos: FilterEstimate, anchors: Map<String, GeoLocation>): FilterEstimate {
+    if (anchors.size < 2) return pos
+    val x = pos.x
+    val y = pos.y
+    val z = pos.z
+
+    val distances = mutableListOf<Pair<Double, GeoLocation>>()
+
+    for (anchor in anchors.values) {
+        val distance = sqrt(
+            (anchor.long - x).pow(2) +
+                    (anchor.lat - y).pow(2) +
+                    (anchor.alt - z).pow(2)
+        )
+        distances.add(Pair(distance, anchor))
+    }
+
+    distances.sortBy { it.first }
+
+    val anchor1 = distances[0].second
+    val anchor2 = distances[1].second
+    val distance1 = distances[0].first
+    val distance2 = distances[1].first
+
+    val totalDist = distance1 + distance2
+    if (totalDist == 0.0) return pos
+
+    val ratio = distance1 / totalDist
+
+    val interpolatedX = anchor1.long * (1.0 - ratio) + anchor2.long * ratio
+    val interpolatedY = anchor1.lat * (1.0 - ratio) + anchor2.lat * ratio
+    val interpolatedZ = anchor1.alt * (1.0 - ratio) + anchor2.alt * ratio
+
+    return FilterEstimate(interpolatedX, interpolatedY, interpolatedZ)
 }

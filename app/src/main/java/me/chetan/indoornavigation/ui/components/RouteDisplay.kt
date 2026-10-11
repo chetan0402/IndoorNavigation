@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import me.chetan.indoornavigation.RouteInstructionGenerator
 import me.chetan.indoornavigation.data.GeoLocation
@@ -325,3 +326,72 @@ private fun getStepIcon(type: RouteStepType): ImageVector {
         RouteStepType.ARRIVE -> Icons.Default.Flag
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun StepTimelineItemPreview() {
+    MaterialTheme {
+        Surface(modifier = Modifier.padding(16.dp)) {
+            Column {
+                StepTimelineItem(
+                    step = RouteStep(
+                        stepIndex = 0,
+                        type = RouteStepType.WALK,
+                        instructionText = "Walk 10.0m straight",
+                        distanceMeters = 10.0,
+                        startPoint = GeoLocation(0.0, 0.0, 0.0),
+                        endPoint = GeoLocation(10.0, 0.0, 0.0)
+                    ),
+                    isCompleted = true,
+                    isActive = false,
+                    isNextHighlighted = false,
+                    isLast = false
+                )
+                StepTimelineItem(
+                    step = RouteStep(
+                        stepIndex = 1,
+                        type = RouteStepType.TURN_RIGHT,
+                        instructionText = "Turn right",
+                        distanceMeters = 2.0,
+                        startPoint = GeoLocation(10.0, 0.0, 0.0),
+                        endPoint = GeoLocation(10.0, 2.0, 0.0)
+                    ),
+                    isCompleted = false,
+                    isActive = true,
+                    isNextHighlighted = false,
+                    isLast = false
+                )
+                StepTimelineItem(
+                    step = RouteStep(
+                        stepIndex = 2,
+                        type = RouteStepType.SLIGHT_LEFT,
+                        instructionText = "Slight left towards Stairs",
+                        distanceMeters = 4.0,
+                        startPoint = GeoLocation(10.0, 2.0, 0.0),
+                        endPoint = GeoLocation(14.0, 2.0, 0.0)
+                    ),
+                    isCompleted = false,
+                    isActive = false,
+                    isNextHighlighted = true,
+                    isLast = false
+                )
+                StepTimelineItem(
+                    step = RouteStep(
+                        stepIndex = 3,
+                        type = RouteStepType.ARRIVE,
+                        instructionText = "Arrive at Destination",
+                        distanceMeters = 0.0,
+                        startPoint = GeoLocation(14.0, 2.0, 0.0),
+                        endPoint = GeoLocation(14.0, 2.0, 0.0),
+                        waypointName = "Destination"
+                    ),
+                    isCompleted = false,
+                    isActive = false,
+                    isNextHighlighted = false,
+                    isLast = true
+                )
+            }
+        }
+    }
+}
+

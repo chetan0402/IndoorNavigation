@@ -1,6 +1,7 @@
 package me.chetan.indoornavigation
 
 import me.chetan.indoornavigation.data.FilterEstimate
+import me.chetan.indoornavigation.data.GeoLocation
 import me.chetan.indoornavigation.data.Measurement
 import me.chetan.indoornavigation.data.Particle
 import java.util.Random
@@ -201,6 +202,13 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         } else {
             FilterEstimate(0.0, 0.0, 0.0)
         }
+    }
+
+    /**
+     * Returns the estimated position interpolated between the two nearest anchors.
+     */
+    fun estimate(anchors: Map<String, GeoLocation>): FilterEstimate {
+        return interpolate(estimate(), anchors)
     }
 
     /**
