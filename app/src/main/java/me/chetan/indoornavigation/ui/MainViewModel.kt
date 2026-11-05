@@ -25,16 +25,38 @@ import me.chetan.indoornavigation.ParticleFilter
 import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.RSSIDistancePredictor
 import me.chetan.indoornavigation.data.ANCHORS
+import me.chetan.indoornavigation.data.ConfigurationParser
+import me.chetan.indoornavigation.data.DEFAULT_BLE_TEXT
+import me.chetan.indoornavigation.data.DEFAULT_GRAPH_TEXT
 import me.chetan.indoornavigation.data.DeviceScanInfo
 import me.chetan.indoornavigation.data.FilterEstimate
+import me.chetan.indoornavigation.data.GeoLocation
 import me.chetan.indoornavigation.data.Measurement
+import me.chetan.indoornavigation.data.NAV_GRAPH
+import me.chetan.indoornavigation.data.ParseResult
 import me.chetan.indoornavigation.data.SCAN_TIMEOUT_MS
 import kotlin.time.Duration.Companion.milliseconds
 
+private const val PREFS_NAME = "indoor_nav_prefs"
+private const val KEY_GRAPH_TEXT = "key_graph_text"
+private const val KEY_BLE_TEXT = "key_ble_text"
+
 class MainViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
     val devices = mutableStateMapOf<String, DeviceScanInfo>()
     val userLocation = mutableStateOf(FilterEstimate(0.0, 0.0, 0.0))
-    
+
+    // Configuration & Settings State
+    val isSettingsOpen = mutableStateOf(false)
+    val graphText = mutableStateOf("")
+    val bleText = mutableStateOf("")
+    val graphError = mutableStateOf<String?>(null)
+    val bleError = mutableStateOf<String?>(null)
+
+    val navGraph = mutableStateOf<Map<GeoLocation, List<GeoLocation>>>(NAV_GRAPH)
+    val anchors = mutableStateOf<Map<String, GeoLocation>>(ANCHORS)
+
     // Debug & Telemetry State
     val isDebugModeEnabled = mutableStateOf(false)
     val particleFilterDebugInfo = mutableStateOf<ParticleFilterDebugInfo?>(null)
@@ -61,23 +83,116 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
         
         isStepSensorAvailable.value = (stepSensor != null)
 
-        // Initialize bounds based on anchors
-        val xCoords = ANCHORS.values.map { it.long }
-        val yCoords = ANCHORS.values.map { it.lat }
-        val zCoords = ANCHORS.values.map { it.alt }
-        
-        particleFilter.setBounds(
-            xMin = (xCoords.minOrNull() ?: 0.0) - 5.0,
-            yMin = (yCoords.minOrNull() ?: 0.0) - 5.0,
-            zMin = (zCoords.minOrNull() ?: 0.0) - 2.0,
-            xMax = (xCoords.maxOrNull() ?: 15.39) + 5.0,
-            yMax = (yCoords.maxOrNull() ?: 27.6) + 5.0,
-            zMax = (zCoords.maxOrNull() ?: 0.0) + 2.0
-        )
-
+        loadConfigurationFromPrefs()
         particleFilterDebugInfo.value = particleFilter.getDebugInfo()
         startCleanupTask()
         registerSensors()
+    }
+
+    private fun loadConfigurationFromPrefs() {
+        val savedGraphText = prefs.getString(KEY_GRAPH_TEXT, DEFAULT_GRAPH_TEXT) ?: DEFAULT_GRAPH_TEXT
+        val savedBleText = prefs.getString(KEY_BLE_TEXT, DEFAULT_BLE_TEXT) ?: DEFAULT_BLE_TEXT
+
+        graphText.value = savedGraphText
+        bleText.value = savedBleText
+
+        val graphParse = ConfigurationParser.parseGraphText(savedGraphText)
+        if (graphParse is ParseResult.Success) {
+            navGraph.value = graphParse.data
+        }
+
+        val bleParse = ConfigurationParser.parseAnchorsText(savedBleText)
+        if (bleParse is ParseResult.Success) {
+            anchors.value = bleParse.data
+        }
+    }
+
+    fun openSettings() {
+        isSettingsOpen.value = true
+    }
+
+    fun closeSettings() {
+        isSettingsOpen.value = false
+    }
+
+    fun updateGraphText(text: String) {
+        graphText.value = text
+        graphError.value = null
+    }
+
+    fun updateBleText(text: String) {
+        bleText.value = text
+        bleError.value = null
+    }
+
+    fun saveConfiguration(): Boolean {
+        var hasError = false
+
+        val graphParse = ConfigurationParser.parseGraphText(graphText.value)
+        val parsedGraph = when (graphParse) {
+            is ParseResult.Success -> {
+                graphError.value = null
+                graphParse.data
+            }
+            is ParseResult.Error -> {
+                graphError.value = graphParse.message
+                hasError = true
+                null
+            }
+        }
+
+        val bleParse = ConfigurationParser.parseAnchorsText(bleText.value)
+        val parsedAnchors = when (bleParse) {
+            is ParseResult.Success -> {
+                bleError.value = null
+                bleParse.data
+            }
+            is ParseResult.Error -> {
+                bleError.value = bleParse.message
+                hasError = true
+                null
+            }
+        }
+
+        if (hasError || parsedGraph == null || parsedAnchors == null) {
+            return false
+        }
+
+        prefs.edit()
+            .putString(KEY_GRAPH_TEXT, graphText.value)
+            .putString(KEY_BLE_TEXT, bleText.value)
+            .apply()
+
+        navGraph.value = parsedGraph
+        anchors.value = parsedAnchors
+        userLocation.value = particleFilter.estimate(parsedAnchors)
+        particleFilterDebugInfo.value = particleFilter.getDebugInfo()
+
+        closeSettings()
+        return true
+    }
+
+    fun resetConfigurationToDefaults() {
+        graphText.value = DEFAULT_GRAPH_TEXT
+        bleText.value = DEFAULT_BLE_TEXT
+        graphError.value = null
+        bleError.value = null
+
+        prefs.edit()
+            .remove(KEY_GRAPH_TEXT)
+            .remove(KEY_BLE_TEXT)
+            .apply()
+
+        val graphParse = ConfigurationParser.parseGraphText(DEFAULT_GRAPH_TEXT)
+        if (graphParse is ParseResult.Success) {
+            navGraph.value = graphParse.data
+        }
+
+        val bleParse = ConfigurationParser.parseAnchorsText(DEFAULT_BLE_TEXT)
+        if (bleParse is ParseResult.Success) {
+            anchors.value = bleParse.data
+            userLocation.value = particleFilter.estimate(bleParse.data)
+        }
     }
 
     private fun registerSensors() {
@@ -94,7 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
     fun absUpdate(x: Double, y: Double, z: Double) {
         particleFilter.absUpdate(x, y, z)
-        userLocation.value = particleFilter.estimate(ANCHORS)
+        userLocation.value = particleFilter.estimate(anchors.value)
         particleFilterDebugInfo.value = particleFilter.getDebugInfo()
         Log.d("ParticleFilter", "Absolute update from QR code: x=$x, y=$y, z=$z")
     }
@@ -106,7 +221,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 stepCount.intValue++
                 lastStepTimestamp.longValue = System.currentTimeMillis()
                 particleFilter.predict(step = 0.7, variance = 0.05)
-                userLocation.value = particleFilter.estimate(ANCHORS)
+                userLocation.value = particleFilter.estimate(anchors.value)
                 particleFilterDebugInfo.value = particleFilter.getDebugInfo()
                 Log.d("Sensor", "Step detected! Step count: ${stepCount.intValue}")
             }
@@ -137,7 +252,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 super.onScanResult(callbackType, result)
                 val address = result.device.address
-                if (address !in ANCHORS) return
+                val activeAnchors = anchors.value
+                if (address !in activeAnchors) return
                 
                 val currentInfo = devices[address]
                 val predictor = currentInfo?.predictor ?: RSSIDistancePredictor()
@@ -146,7 +262,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                 devices[address] = DeviceScanInfo(dis, predictor, System.currentTimeMillis())
                 
                 // Buffer measurement for batch update
-                val anchor = ANCHORS[address]!!
+                val anchor = activeAnchors[address]!!
                 measurementBuffer[address] = Measurement(
                     x = anchor.long,
                     y = anchor.lat,
@@ -165,7 +281,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     lastUpdateTimestamp = currentTime
                     bleUpdateCount.intValue++
                     lastBleUpdateTimestamp.longValue = currentTime
-                    userLocation.value = particleFilter.estimate(ANCHORS)
+                    userLocation.value = particleFilter.estimate(activeAnchors)
                     particleFilterDebugInfo.value = particleFilter.getDebugInfo()
                 }
             }

@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import me.chetan.indoornavigation.ParticleFilterDebugInfo
 import me.chetan.indoornavigation.data.FilterEstimate
 import me.chetan.indoornavigation.data.GeoLocation
-import me.chetan.indoornavigation.data.NAV_GRAPH
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -52,7 +51,8 @@ fun DebugContainer(
     bleUpdateCount: Int,
     lastBleUpdateTimestamp: Long,
     route: List<GeoLocation> = emptyList(),
-    currentLocation: GeoLocation? = null
+    currentLocation: GeoLocation? = null,
+    graph: Map<GeoLocation, List<GeoLocation>> = emptyMap()
 ) {
     Card(
         modifier = Modifier
@@ -102,7 +102,7 @@ fun DebugContainer(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     RouteGraph(
-                        graph = NAV_GRAPH,
+                        graph = graph,
                         route = route,
                         currentLocation = currentLocation
                     )
@@ -166,18 +166,6 @@ fun DebugContainer(
                                 particleFilterDebugInfo.stdDevY,
                                 particleFilterDebugInfo.stdDevZ
                             )
-                        )
-                        DebugRow(
-                            label = "X Bounds",
-                            value = String.format(Locale.US, "[%.1f .. %.1f] m", particleFilterDebugInfo.xMin, particleFilterDebugInfo.xMax)
-                        )
-                        DebugRow(
-                            label = "Y Bounds",
-                            value = String.format(Locale.US, "[%.1f .. %.1f] m", particleFilterDebugInfo.yMin, particleFilterDebugInfo.yMax)
-                        )
-                        DebugRow(
-                            label = "Z Bounds",
-                            value = String.format(Locale.US, "[%.1f .. %.1f] m", particleFilterDebugInfo.zMin, particleFilterDebugInfo.zMax)
                         )
                     } else {
                         Text(

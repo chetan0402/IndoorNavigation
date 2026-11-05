@@ -45,7 +45,6 @@ import me.chetan.indoornavigation.PathFind
 import me.chetan.indoornavigation.data.DeviceScanInfo
 import me.chetan.indoornavigation.data.FilterEstimate
 import me.chetan.indoornavigation.data.GeoLocation
-import me.chetan.indoornavigation.data.NAV_GRAPH
 import me.chetan.indoornavigation.ui.components.BLEContainer
 import me.chetan.indoornavigation.ui.components.DebugContainer
 import me.chetan.indoornavigation.ui.components.RouteDisplay
@@ -65,6 +64,8 @@ fun MainScreen(viewModel: MainViewModel) {
         isStepSensorAvailable = viewModel.isStepSensorAvailable.value,
         bleUpdateCount = viewModel.bleUpdateCount.intValue,
         lastBleUpdateTimestamp = viewModel.lastBleUpdateTimestamp.longValue,
+        navGraph = viewModel.navGraph.value,
+        anchors = viewModel.anchors.value,
         onAbsUpdate = { x, y, z -> viewModel.absUpdate(x, y, z) }
     )
 }
@@ -84,6 +85,8 @@ fun MainScreen(
     isStepSensorAvailable: Boolean = false,
     bleUpdateCount: Int = 0,
     lastBleUpdateTimestamp: Long = 0L,
+    navGraph: Map<GeoLocation, List<GeoLocation>> = emptyMap(),
+    anchors: Map<String, GeoLocation> = emptyMap(),
     onAbsUpdate: (Double, Double, Double) -> Unit = { _, _, _ -> }
 ) {
     var query by remember { mutableStateOf("") }
@@ -94,15 +97,15 @@ fun MainScreen(
         GeoLocation(userEstimate.x, userEstimate.y, userEstimate.z, "Current Location")
     }
 
-    val route = remember(currentLocation, selectedDestination) {
+    val route = remember(currentLocation, selectedDestination, navGraph) {
         if (selectedDestination != null) {
-            val pathFinder = PathFind(NAV_GRAPH.mapValues { it.value.toMutableList() })
+            val pathFinder = PathFind(navGraph.mapValues { it.value.toMutableList() })
             pathFinder.route(currentLocation, selectedDestination!!)
         } else null
     }
 
-    val searchResults = remember(query) {
-        NAV_GRAPH.keys.filter {
+    val searchResults = remember(query, navGraph) {
+        navGraph.keys.filter {
             it.name.contains(query, ignoreCase = true) && it.name.isNotEmpty()
         }
     }
@@ -226,11 +229,12 @@ fun MainScreen(
                 bleUpdateCount = bleUpdateCount,
                 lastBleUpdateTimestamp = lastBleUpdateTimestamp,
                 route = route ?: emptyList(),
-                currentLocation = currentLocation
+                currentLocation = currentLocation,
+                graph = navGraph
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-            BLEContainer(devices)
+            BLEContainer(devices = devices, anchors = anchors)
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

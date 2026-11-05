@@ -16,12 +16,6 @@ import kotlin.math.sqrt
 data class ParticleFilterDebugInfo(
     val numParticles: Int,
     val activeParticlesCount: Int,
-    val xMin: Double,
-    val xMax: Double,
-    val yMin: Double,
-    val yMax: Double,
-    val zMin: Double,
-    val zMax: Double,
     val stdDevX: Double,
     val stdDevY: Double,
     val stdDevZ: Double,
@@ -33,15 +27,8 @@ class ParticleFilter(private val numParticles: Int = 1000) {
     private var particles = mutableListOf<Particle>()
     private val random = Random()
 
-    private var xMin = -Double.MAX_VALUE
-    private var xMax = Double.MAX_VALUE
-    private var yMin = -Double.MAX_VALUE
-    private var yMax = Double.MAX_VALUE
-    private var zMin = -Double.MAX_VALUE
-    private var zMax = Double.MAX_VALUE
-
     init {
-        initializeParticles(0.0,0.0,0.0)
+        initializeParticles(0.0, 0.0, 0.0)
     }
 
     private fun initializeParticles(x: Double, y: Double, z: Double) {
@@ -58,21 +45,8 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         }
     }
 
-    fun absUpdate(x: Double, y: Double, z: Double){
-        initializeParticles(x,y,z)
-    }
-
-    /**
-     * Updates boundaries. Soft boundary handling: particles are not immediately moved,
-     * but will be penalized in the update step.
-     */
-    fun setBounds(xMin: Double, yMin: Double, zMin: Double, xMax: Double, yMax: Double, zMax: Double) {
-        this.xMin = xMin
-        this.yMin = yMin
-        this.zMin = zMin
-        this.xMax = xMax
-        this.yMax = yMax
-        this.zMax = zMax
+    fun absUpdate(x: Double, y: Double, z: Double) {
+        initializeParticles(x, y, z)
     }
 
     /**
@@ -92,7 +66,7 @@ class ParticleFilter(private val numParticles: Int = 1000) {
     }
 
     /**
-     * Update step: Supports multiple measurements. Particles out of bounds get zero weight.
+     * Update step: Supports multiple measurements.
      */
     fun update(measurements: List<Measurement>) {
         if (measurements.isEmpty()) return
@@ -100,12 +74,6 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         var sumWeights = 0.0
 
         for (particle in particles) {
-            // Soft boundary check
-            if (particle.x !in xMin..xMax || particle.y !in yMin..yMax || particle.z !in zMin..zMax) {
-                particle.weight = 0.0
-                continue
-            }
-
             var totalLogLikelihood = 0.0
             for ((x, y, z, radius, variance) in measurements) {
                 val dist = sqrt(
@@ -158,9 +126,9 @@ class ParticleFilter(private val numParticles: Int = 1000) {
             // Add jitter to resampled particles to maintain diversity, including heading offset
             newParticles.add(
                 Particle(
-                    x = (p.x + random.nextGaussian() * 0.2).coerceIn(xMin, xMax),
-                    y = (p.y + random.nextGaussian() * 0.2).coerceIn(yMin, yMax),
-                    z = (p.z + random.nextGaussian() * 0.05).coerceIn(zMin, zMax),
+                    x = p.x + random.nextGaussian() * 0.2,
+                    y = p.y + random.nextGaussian() * 0.2,
+                    z = p.z + random.nextGaussian() * 0.05,
                     weight = 1.0 / numParticles
                 )
             )
@@ -212,9 +180,6 @@ class ParticleFilter(private val numParticles: Int = 1000) {
             return ParticleFilterDebugInfo(
                 numParticles = numParticles,
                 activeParticlesCount = 0,
-                xMin = xMin, xMax = xMax,
-                yMin = yMin, yMax = yMax,
-                zMin = zMin, zMax = zMax,
                 stdDevX = 0.0, stdDevY = 0.0, stdDevZ = 0.0,
                 effectiveParticles = 0.0,
                 maxWeight = 0.0
@@ -250,12 +215,6 @@ class ParticleFilter(private val numParticles: Int = 1000) {
         return ParticleFilterDebugInfo(
             numParticles = particles.size,
             activeParticlesCount = activeCount,
-            xMin = xMin,
-            xMax = xMax,
-            yMin = yMin,
-            yMax = yMax,
-            zMin = zMin,
-            zMax = zMax,
             stdDevX = sqrt(varSumX.coerceAtLeast(0.0)),
             stdDevY = sqrt(varSumY.coerceAtLeast(0.0)),
             stdDevZ = sqrt(varSumZ.coerceAtLeast(0.0)),

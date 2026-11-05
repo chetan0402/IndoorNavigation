@@ -19,12 +19,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import me.chetan.indoornavigation.data.ANCHORS
 import me.chetan.indoornavigation.data.DeviceScanInfo
+import me.chetan.indoornavigation.data.GeoLocation
 import java.util.Locale
 
 @Composable
-fun BLEContainer(devices: Map<String, DeviceScanInfo>) {
+fun BLEContainer(
+    devices: Map<String, DeviceScanInfo>,
+    anchors: Map<String, GeoLocation> = emptyMap()
+) {
     if (devices.isEmpty()) return
 
     Card(
@@ -50,7 +53,7 @@ fun BLEContainer(devices: Map<String, DeviceScanInfo>) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = ANCHORS[address]?.name ?: address,
+                        text = anchors[address]?.name ?: address,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(

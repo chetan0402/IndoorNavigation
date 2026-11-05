@@ -14,7 +14,11 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -23,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import me.chetan.indoornavigation.ui.MainScreen
 import me.chetan.indoornavigation.ui.MainViewModel
+import me.chetan.indoornavigation.ui.SettingsScreen
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -70,19 +75,31 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text("Indoor Navigation") }
-                        )
-                    }
-                ) { innerPadding ->
-                    Column(
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .fillMaxSize()
-                    ) {
-                        MainScreen(viewModel)
+                if (viewModel.isSettingsOpen.value) {
+                    SettingsScreen(viewModel)
+                } else {
+                    Scaffold(
+                        topBar = {
+                            TopAppBar(
+                                title = { Text("Indoor Navigation") },
+                                actions = {
+                                    IconButton(onClick = { viewModel.openSettings() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Settings,
+                                            contentDescription = "Settings"
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    ) { innerPadding ->
+                        Column(
+                            modifier = Modifier
+                                .padding(innerPadding)
+                                .fillMaxSize()
+                        ) {
+                            MainScreen(viewModel)
+                        }
                     }
                 }
             }
