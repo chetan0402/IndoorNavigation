@@ -48,6 +48,7 @@ import me.chetan.indoornavigation.data.GeoLocation
 import me.chetan.indoornavigation.ui.components.BLEContainer
 import me.chetan.indoornavigation.ui.components.DebugContainer
 import me.chetan.indoornavigation.ui.components.RouteDisplay
+import me.chetan.indoornavigation.ui.components.RouteGraph3D
 import java.util.Locale
 
 @Composable
@@ -217,6 +218,13 @@ fun MainScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+            RouteGraph3D(
+                graph = navGraph,
+                route = route ?: emptyList(),
+                currentLocation = currentLocation
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
             DebugContainer(
                 isDebugEnabled = isDebugEnabled,
                 onToggleDebug = onToggleDebug,
@@ -227,10 +235,7 @@ fun MainScreen(
                 lastStepLength = lastStepLength,
                 isStepSensorAvailable = isStepSensorAvailable,
                 bleUpdateCount = bleUpdateCount,
-                lastBleUpdateTimestamp = lastBleUpdateTimestamp,
-                route = route ?: emptyList(),
-                currentLocation = currentLocation,
-                graph = navGraph
+                lastBleUpdateTimestamp = lastBleUpdateTimestamp
             )
 
             Spacer(modifier = Modifier.height(16.dp))

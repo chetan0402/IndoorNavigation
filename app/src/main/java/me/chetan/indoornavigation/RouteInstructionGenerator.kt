@@ -54,12 +54,12 @@ object RouteInstructionGenerator {
                 val prev = route[i - 1]
                 val turnAngle = calculateTurnAngle(prev, start, end)
                 stepType = when {
-                    turnAngle in 25.0..110.0 -> RouteStepType.TURN_RIGHT
-                    turnAngle in -110.0..-25.0 -> RouteStepType.TURN_LEFT
-                    turnAngle in 10.0..25.0 -> RouteStepType.SLIGHT_RIGHT
-                    turnAngle in -25.0..-10.0 -> RouteStepType.SLIGHT_LEFT
-                    turnAngle > 110.0 -> RouteStepType.TURN_RIGHT
-                    turnAngle < -110.0 -> RouteStepType.TURN_LEFT
+                    turnAngle in 25.0..110.0 -> RouteStepType.TURN_LEFT
+                    turnAngle in -110.0..-25.0 -> RouteStepType.TURN_RIGHT
+                    turnAngle in 10.0..25.0 -> RouteStepType.SLIGHT_LEFT
+                    turnAngle in -25.0..-10.0 -> RouteStepType.SLIGHT_RIGHT
+                    turnAngle > 110.0 -> RouteStepType.TURN_LEFT
+                    turnAngle < -110.0 -> RouteStepType.TURN_RIGHT
                     else -> RouteStepType.WALK
                 }
             } else {
