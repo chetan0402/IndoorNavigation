@@ -26,10 +26,8 @@ data class ParticleFilterDebugInfo(
 class ParticleFilter(private val numParticles: Int = 1000) {
     private var particles = mutableListOf<Particle>()
     private val random = Random()
-
-    init {
-        initializeParticles(0.0, 0.0, 0.0)
-    }
+    var isInitialized: Boolean = false
+        private set
 
     private fun initializeParticles(x: Double, y: Double, z: Double) {
         particles.clear()
@@ -47,6 +45,7 @@ class ParticleFilter(private val numParticles: Int = 1000) {
 
     fun absUpdate(x: Double, y: Double, z: Double) {
         initializeParticles(x, y, z)
+        isInitialized = true
     }
 
     /**
@@ -54,6 +53,7 @@ class ParticleFilter(private val numParticles: Int = 1000) {
      * totally ignoring phone azimuth (yaw).
      */
     fun predict(step: Double, variance: Double) {
+        if (!isInitialized) return
         val std = sqrt(variance)
         for (particle in particles) {
             val noisyStep = step + random.nextGaussian() * std
@@ -69,7 +69,7 @@ class ParticleFilter(private val numParticles: Int = 1000) {
      * Update step: Supports multiple measurements.
      */
     fun update(measurements: List<Measurement>) {
-        if (measurements.isEmpty()) return
+        if (!isInitialized || measurements.isEmpty()) return
 
         var sumWeights = 0.0
 

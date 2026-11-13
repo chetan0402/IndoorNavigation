@@ -13,6 +13,7 @@ class ParticleFilterMetric {
     @Test
     fun metric20261005_094042(){
         val particleFilter = ParticleFilter()
+        particleFilter.absUpdate(0.0, 0.0, 0.0)
 
         val distancePredictors = mutableMapOf<String, RSSIDistancePredictor>()
 

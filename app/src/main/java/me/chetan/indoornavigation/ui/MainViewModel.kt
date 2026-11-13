@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.chetan.indoornavigation.ParticleFilter
 import me.chetan.indoornavigation.ParticleFilterDebugInfo
+import me.chetan.indoornavigation.PathFind
 import me.chetan.indoornavigation.RSSIDistancePredictor
 import me.chetan.indoornavigation.data.ANCHORS
 import me.chetan.indoornavigation.data.ConfigurationParser
@@ -46,6 +47,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
     val devices = mutableStateMapOf<String, DeviceScanInfo>()
     val userLocation = mutableStateOf(FilterEstimate(0.0, 0.0, 0.0))
+    val isLocationInitialized = mutableStateOf(false)
 
     // Configuration & Settings State
     val isSettingsOpen = mutableStateOf(false)
@@ -209,6 +211,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
     fun absUpdate(x: Double, y: Double, z: Double) {
         particleFilter.absUpdate(x, y, z)
+        isLocationInitialized.value = true
         userLocation.value = particleFilter.estimate(anchors.value)
         particleFilterDebugInfo.value = particleFilter.getDebugInfo()
         Log.d("ParticleFilter", "Absolute update from QR code: x=$x, y=$y, z=$z")
@@ -273,10 +276,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
 
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastUpdateTimestamp > updateIntervalMs) {
-                    val closestMeasurements = measurementBuffer.values.sortedBy { it.radius }.take(2)
-                    if (closestMeasurements.isNotEmpty()) {
-                        particleFilter.update(closestMeasurements)
+                    val activeBleDevices = devices.filter { (addr, info) ->
+                        addr in activeAnchors && currentTime - info.lastSeen <= SCAN_TIMEOUT_MS
                     }
+
+                    if (!particleFilter.isInitialized) {
+                        if (activeBleDevices.size >= 2) {
+                            val anchorList = mutableListOf<GeoLocation>()
+                            val distanceList = mutableListOf<Double>()
+                            for ((addr, info) in activeBleDevices) {
+                                val anchorGeo = activeAnchors[addr]
+                                if (anchorGeo != null) {
+                                    anchorList.add(anchorGeo)
+                                    distanceList.add(info.distance)
+                                }
+                            }
+                            if (anchorList.size >= 2) {
+                                val pathFind = PathFind(navGraph.value.mapValues { it.value.toMutableList() })
+                                val initialLocation = pathFind.trilaterate(anchorList, distanceList)
+                                particleFilter.absUpdate(initialLocation.long, initialLocation.lat, initialLocation.alt)
+                                isLocationInitialized.value = true
+                                Log.d("ParticleFilter", "Initialized via trilateration from ${anchorList.size} BLE signals: $initialLocation")
+                            }
+                        }
+                    }
+
+                    if (particleFilter.isInitialized) {
+                        val closestMeasurements = measurementBuffer.values.sortedBy { it.radius }.take(2)
+                        if (closestMeasurements.isNotEmpty()) {
+                            particleFilter.update(closestMeasurements)
+                        }
+                    }
+
                     measurementBuffer.clear()
                     lastUpdateTimestamp = currentTime
                     bleUpdateCount.intValue++

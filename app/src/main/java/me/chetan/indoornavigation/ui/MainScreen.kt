@@ -56,6 +56,7 @@ fun MainScreen(viewModel: MainViewModel) {
     MainScreen(
         devices = viewModel.devices,
         userEstimate = viewModel.userLocation.value,
+        isLocationInitialized = viewModel.isLocationInitialized.value,
         isDebugEnabled = viewModel.isDebugModeEnabled.value,
         onToggleDebug = { viewModel.toggleDebugMode() },
         particleFilterDebugInfo = viewModel.particleFilterDebugInfo.value,
@@ -77,6 +78,7 @@ fun MainScreen(viewModel: MainViewModel) {
 fun MainScreen(
     devices: Map<String, DeviceScanInfo>,
     userEstimate: FilterEstimate,
+    isLocationInitialized: Boolean = false,
     isDebugEnabled: Boolean = false,
     onToggleDebug: (Boolean) -> Unit = {},
     particleFilterDebugInfo: ParticleFilterDebugInfo? = null,
@@ -175,10 +177,17 @@ fun MainScreen(
                             text = "Your Location",
                             style = MaterialTheme.typography.labelMedium
                         )
-                        Text(
-                            text = "(${String.format(Locale.US, "%.2f", currentLocation.long)}, ${String.format(Locale.US, "%.2f", currentLocation.lat)}, ${String.format(Locale.US,"%.2f",currentLocation.alt)})",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (!isLocationInitialized) {
+                            Text(
+                                text = "Finding location (move around or scan QR)",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        } else {
+                            Text(
+                                text = "(${String.format(Locale.US, "%.2f", currentLocation.long)}, ${String.format(Locale.US, "%.2f", currentLocation.lat)}, ${String.format(Locale.US,"%.2f",currentLocation.alt)})",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
 
                     val context = LocalContext.current
