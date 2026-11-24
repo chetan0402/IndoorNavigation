@@ -1,8 +1,8 @@
 # Multi-Sensor Indoor Localization and Navigation Framework
 
-An end-to-end, sub-meter indoor localization and turn-by-turn navigation system for Android. This framework combines **Bluetooth Low Energy (BLE) RSSI distance modeling**, **Pedestrian Dead Reckoning (PDR) step detection**, **Monte Carlo Particle Filtering (MCL)**, **Optical QR Code Absolute Positioning**, **Topological Pathfinding**, and **Natural Language Route Instruction Generation**.
+An end-to-end, sub-meter indoor localization and turn-by-turn navigation system for Android. This framework combines **Bluetooth Low Energy (BLE) RSSI distance modeling**, **Pedestrian Dead Reckoning (PDR) step detection**, **Monte Carlo Particle Filtering (MCL)** with deferred trilateration initialization, **Optical QR Code Absolute Positioning**, **Topological Pathfinding**, **Interactive 3D Spatial Route Graph Visualization**, and **Natural Language Route Instruction Generation**.
 
-This document details the mathematical models, algorithmic architecture, signal processing pipeline, and software engineering implementation of the project to serve as a comprehensive reference for research white papers and technical documentation.
+This document details the mathematical models, algorithmic architecture, signal processing pipeline, software engineering implementation, and dynamic configuration tools of the project to serve as a comprehensive reference for research white papers and technical documentation.
 
 ---
 
@@ -16,6 +16,7 @@ This document details the mathematical models, algorithmic architecture, signal 
    - [Empirical Calibration Tool (`fit_path_loss.py`)](#empirical-calibration-tool-fit_path_loss-py)
 4. [Localization Engine: Particle Filter & Sensor Fusion](#4-localization-engine-particle-filter--sensor-fusion)
    - [State Representation](#state-representation)
+   - [Deferred Location Initialization](#deferred-location-initialization)
    - [Prediction Step (Pedestrian Dead Reckoning)](#prediction-step-pedestrian-dead-reckoning)
    - [Update Step (BLE Measurement Likelihood)](#update-step-ble-measurement-likelihood)
    - [Systematic Resampling & Jitter Injection](#systematic-resampling--jitter-injection)
@@ -29,8 +30,12 @@ This document details the mathematical models, algorithmic architecture, signal 
    - [Turn Angle Calculation](#turn-angle-calculation)
    - [Collinear Step Merging](#collinear-step-merging)
    - [Dynamic Active Step Tracking](#dynamic-active-step-tracking)
-8. [User Interface & Debug Telemetry](#8-user-interface--debug-telemetry)
-9. [Simulation & Testing Tools](#9-simulation--testing-tools)
+8. [User Interface, 3D Visualizer & Dynamic Configuration](#8-user-interface-3d-visualizer--dynamic-configuration)
+   - [Main Application Interface (`MainScreen.kt`)](#main-application-interface-mainscreenkt)
+   - [Interactive 3D Spatial Visualizer (`RouteGraph3D.kt`)](#interactive-3d-spatial-visualizer-routegraph3dkt)
+   - [Dynamic Runtime Configuration (`SettingsScreen.kt` & `ConfigurationParser.kt`)](#dynamic-runtime-configuration-settingsscreenkt--configurationparserkt)
+   - [Debug Telemetry Panel (`DebugContainer.kt`)](#debug-telemetry-panel-debugcontainerkt)
+9. [Simulation, Testing & Metrics Tools](#9-simulation-testing--metrics-tools)
 10. [Repository Structure & Specifications](#10-repository-structure--specifications)
 
 ---
@@ -50,7 +55,7 @@ A **Monte Carlo Particle Filter** fuses these asynchronous inputs into a continu
 
 ## 2. System Architecture
 
-The software architecture is modularized into four primary tiers: Data Acquisition, Signal & State Estimation, Routing Engine, and Presentation Layer.
+The software architecture is modularized into four primary tiers: Data Acquisition, Signal & State Estimation, Routing Engine, and Presentation & Configuration Layer.
 
 ```
 +-----------------------------------------------------------------------+
@@ -62,12 +67,12 @@ The software architecture is modularized into four primary tiers: Data Acquisiti
 +----------------------------+--------------------------+---------------+
 |                   SIGNAL PROCESSING & STATE FUSION                    |
 |  - Log-Distance Path Loss Model + EMA Smoothing                       |
-|  - Monte Carlo Particle Filter (1000 Particles)                       |
-|    * Prediction: PDR Noise-Injected Motion Model                     |
-|    * Update: Gaussian Likelihood over Top-2 Nearest Beacons           |
+|  - Deferred Particle Seeding (Trilateration or QR Scan Initialization)|
+|  - Monte Carlo Particle Filter (1,000 Particles)                      |
+|    * Prediction: PDR Noise-Injected Motion Model (Omnidirectional)   |
+|    * Update: Gaussian Likelihood over Top-2 Nearest Active Beacons    |
 |    * Resampling: Systematic Resampling with Spatial Jitter            |
 |  - Spatial Anchor Linear Interpolation                                |
-|  - QR Code Absolute Location Re-initialization                        |
 +------------------------------------+----------------------------------+
                                      |
                                      v
@@ -81,10 +86,11 @@ The software architecture is modularized into four primary tiers: Data Acquisiti
                                      |
                                      v
 +------------------------------------+----------------------------------+
-|                          PRESENTATION LAYER                           |
+|               PRESENTATION & CONFIGURATION LAYER                      |
 |  - Jetpack Compose & Material 3 UI                                    |
-|  - Interactive Destination Search & Timeline Route Instructions       |
-|  - Visual Debug Canvas Graph & Real-Time Telemetry Stats Panel        |
+|  - Interactive 3D Spatial Route Graph Visualizer (Yaw/Pitch/Orbit)    |
+|  - Dynamic Runtime Graph & BLE Configuration (SharedPreferences)      |
+|  - Visual Debug Telemetry Panel & Scan Metrics                        |
 +-----------------------------------------------------------------------+
 ```
 
@@ -129,7 +135,7 @@ The repository includes a Python regression utility (`fit_path_loss.py`) that an
 
 ## 4. Localization Engine: Particle Filter & Sensor Fusion
 
-The core positioning engine is a non-linear, non-Gaussian Bayesian estimator implemented as a **Sequential Monte Carlo Particle Filter** (`ParticleFilter.kt`) using $N = 1000$ particles.
+The core positioning engine is a non-linear, non-Gaussian Bayesian estimator implemented as a **Sequential Monte Carlo Particle Filter** (`ParticleFilter.kt`) using $N = 1,000$ particles.
 
 ### State Representation
 
@@ -137,7 +143,14 @@ Each particle $p_i$ represents a candidate 3D position hypothesis with an associ
 
 $$p_i = \left( x_i, y_i, z_i, w_i \right), \quad i \in \{1, \dots, N\}, \quad \sum_{i=1}^N w_i = 1$$
 
-Spatial boundaries $[x_{\min}, x_{\max}] \times [y_{\min}, y_{\max}] \times [z_{\min}, z_{\max}]$ are dynamically set based on anchor beacon bounds plus a $5\,\text{m}$ buffer.
+### Deferred Location Initialization
+
+To prevent false early convergence around an arbitrary origin, location estimation is **deferred** upon startup (`isInitialized = false`). Particle motion predictions and likelihood updates are bypassed until the filter is explicitly seeded through one of two mechanisms:
+
+1. **BLE Trilateration Seeding**: When at least 2 active BLE anchor measurements are received within `SCAN_TIMEOUT_MS` ($10\,\text{seconds}$), an initial spatial estimate $(\hat{x}_0, \hat{y}_0, \hat{z}_0)$ is computed via distance-weighted trilateration. Particles are then seeded around this coordinate with Gaussian noise.
+2. **Optical QR Code Scan**: Scanning a landmark QR code immediately calls `absUpdate(x, y, z)`, seeding all 1,000 particles in a concentrated Gaussian distribution ($\sigma = 1.0\,\text{m}$) around $(x_{\text{qr}}, y_{\text{qr}}, z_{\text{qr}})$.
+
+While uninitialized, the UI displays an informative status banner: `"Finding location (move around or scan QR)"`.
 
 ### Prediction Step (Pedestrian Dead Reckoning)
 
@@ -155,7 +168,7 @@ Where:
 
 ### Update Step (BLE Measurement Likelihood)
 
-When a BLE scan result arrives, the Euclidean distance $d_{i, k}$ between particle $p_i$ and anchor beacon $k$ at $(X_k, Y_k, Z_k)$ is evaluated:
+When a BLE scan result arrives, the Euclidean distance $d_{i, k}$ between particle $p_i$ and active anchor beacon $k$ at $(X_k, Y_k, Z_k)$ is evaluated:
 
 $$d_{i, k} = \sqrt{(x_i - X_k)^2 + (y_i - Y_k)^2 + (z_i - Z_k)^2}$$
 
@@ -167,7 +180,7 @@ To mitigate multipath corruption from distant beacons behind walls, **only the t
 
 $$\ln w_i^{(t)} = \ln w_i^{(t-1)} + \sum_{k \in \text{Top-2}} \ln p(r_k \mid p_i)$$
 
-Particles outside spatial boundaries are assigned $w_i = 0$. Weights are normalized such that $\sum w_i = 1$.
+Weights are normalized such that $\sum w_i = 1$. Unrestricted particle movement without artificial bounding box clamping ensures smooth spatial propagation.
 
 ### Systematic Resampling & Jitter Injection
 
@@ -177,9 +190,9 @@ $$N_{\text{eff}} = \frac{1}{\sum_{i=1}^N (w_i)^2}$$
 
 During resampling, new particles are sampled proportionally to cumulative weights. To prevent particle collapse onto single points (sample impoverishment), Gaussian spatial jitter is added:
 
-$$x_{\text{resampled}} = \text{clamp}\left(x_p + \mathcal{N}(0, 0.2\,\text{m}), x_{\min}, x_{\max}\right)$$
-$$y_{\text{resampled}} = \text{clamp}\left(y_p + \mathcal{N}(0, 0.2\,\text{m}), y_{\min}, y_{\max}\right)$$
-$$z_{\text{resampled}} = \text{clamp}\left(z_p + \mathcal{N}(0, 0.05\,\text{m}), z_{\min}, z_{\max}\right)$$
+$$x_{\text{resampled}} = x_p + \mathcal{N}(0, 0.2\,\text{m})$$
+$$y_{\text{resampled}} = y_p + \mathcal{N}(0, 0.2\,\text{m})$$
+$$z_{\text{resampled}} = z_p + \mathcal{N}(0, 0.05\,\text{m})$$
 
 ### Spatial Anchor Interpolation
 
@@ -201,7 +214,7 @@ To handle initial cold starts and eliminate long-term dead-reckoning drift, the 
 When the user scans a QR code placed at a known location $(x_{\text{qr}}, y_{\text{qr}}, z_{\text{qr}})$:
 1. `absUpdate(x, y, z)` is invoked.
 2. All 1,000 particles are immediately re-initialized in a concentrated Gaussian cloud centered at $(x_{\text{qr}}, y_{\text{qr}}, z_{\text{qr}})$ with standard deviation $1.0\,\text{m}$.
-3. The location estimate instantly updates with zero latency.
+3. The location estimate instantly updates with zero latency and sets `isInitialized = true`.
 
 ---
 
@@ -267,38 +280,65 @@ Turn instructions are classified based on $\theta_{\text{turn}}$ and elevation c
 
 ---
 
-## 8. User Interface & Debug Telemetry
+## 8. User Interface, 3D Visualizer & Dynamic Configuration
 
-Built with **Jetpack Compose** and **Material 3**, the application UI provides intuitive navigation along with diagnostic capabilities for researchers and developers.
+Built with **Jetpack Compose** and **Material 3**, the application UI provides real-time navigation guidance, interactive spatial rendering, and dynamic configuration tools.
 
-- **Main View (`MainScreen.kt`)**: Features a Material 3 `SearchBar` with real-time text matching against indoor room names, current location display, and direct camera trigger for QR scanning.
-- **Route Display (`RouteDisplay.kt`)**: Displays a timeline view of navigation instructions with dynamic "NEXT" highlighting, remaining step distance, and completion checkmarks.
-- **Visual Debug Panel (`DebugContainer.kt` & `RouteGraph.kt`)**:
-  - **Graph Canvas**: Renders the raw topological node network, active route edges, and user location dot on an interactive 2D canvas.
-  - **Particle Telemetry**: Displays total particle count, active particles, effective particle count $N_{\text{eff}}$, spatial standard deviation $(\sigma_X, \sigma_Y, \sigma_Z)$, and spatial bounds $[x_{\min}..x_{\max}], [y_{\min}..y_{\max}]$.
-  - **Sensor & BLE Metrics**: Real-time display of step count, step length, timestamp, BLE scan rate, and individual beacon RSSI predictor readings.
+### Main Application Interface (`MainScreen.kt`)
+- **Interactive SearchBar**: Auto-completes room names against configured navigation graph nodes.
+- **Location Status Card**: Displays live $(x, y, z)$ coordinates when localized, or `"Finding location (move around or scan QR)"` during initial scanning.
+- **Navigation Timeline (`RouteDisplay.kt`)**: Displays turn-by-turn guidance steps with dynamic step highlighting and checkmark completion.
+- **Settings Gear Icon**: Provides direct access to runtime configuration management.
+
+### Interactive 3D Spatial Visualizer (`RouteGraph3D.kt`)
+Replaces legacy 2D drawing with an interactive **3D spatial canvas**:
+- **3D Projection Pipeline**: Transforms 3D world coordinates $(x, y, z)$ onto a 2D screen surface using adjustable field-of-view, perspective scale factor, yaw, and pitch angles.
+- **Gesture Control**: Supports drag gestures for custom Orbit mode (adjusting pitch $15^\circ..85^\circ$ and yaw $0^\circ..360^\circ$).
+- **Smart View Controls**:
+  - **Auto-Alignment**: Calculates the principal vector of the active navigation route and automatically aligns camera heading to match user travel direction.
+  - **Auto-Rotation**: Smooth continuous rotation mode for spatial overview.
+- **3D Rendered Elements**:
+  - Translucent floor grid plane.
+  - Depth-sorted nodes and connecting corridor edges (highlighting active navigation route in vibrant primary colors).
+  - Animated pulsing user location indicator with vertical shadow projection to the floor plane.
+  - Node label pill cards anchored to 3D projected coordinates.
+
+### Dynamic Runtime Configuration (`SettingsScreen.kt` & `ConfigurationParser.kt`)
+Eliminates hardcoded graph dependencies, allowing users to configure floor plans and beacon deployments directly at runtime without recompiling code:
+- **Navigation Graph Text Format**:
+  - Node definitions: `Name, X, Y, Z` (e.g. `Lab 1, 15.39, 27.6, 0.0`)
+  - Edge definitions: `NodeA-NodeB` (e.g. `Lab 1-Corridor 2`)
+- **BLE Beacon Anchors Text Format**:
+  - Anchor definitions: `MAC Address, X, Y, Z[, Name]` (e.g. `2D:7E:1A:02:3D:21, 0.0, 0.0, 0.0, BLE1`)
+- **Validation Engine (`ConfigurationParser`)**: Instant syntax checking highlighting line-by-line errors (duplicate node names, unknown edge endpoints, invalid numeric coordinates, duplicate MAC addresses).
+- **Persistence**: Saved automatically to Android `SharedPreferences` (`indoor_nav_prefs`). Includes a `"Reset Defaults"` option to restore built-in fallback configurations (`DEFAULT_GRAPH_TEXT`, `DEFAULT_BLE_TEXT`).
+
+### Debug Telemetry Panel (`DebugContainer.kt`)
+Provides real-time diagnostic metrics for research and algorithm analysis:
+- Embedded 3D spatial route graph visualizer.
+- **Filter Telemetry**: Active particle count, effective sample size $N_{\text{eff}}$, spatial standard deviation $(\sigma_X, \sigma_Y, \sigma_Z)$, and maximum particle weight.
+- **Sensor & BLE Telemetry**: Live step detector count, estimated step length, timestamp, BLE scan rate, and individual beacon RSSI predictor readings.
 
 ---
 
-## 9. Simulation & Testing Tools
+## 9. Simulation, Testing & Metrics Tools
 
 ### Python Step-by-Step Simulator (`particle_filter.py`)
-
-A stand-alone Python application allows off-device replay and visual debugging of recorded telemetry files (`BLE_Telemetry_*.json`).
+A stand-alone Python application for off-device replay and visual debugging of recorded telemetry files (`BLE_Telemetry_*.json`):
 - Visualizes particle cloud movement, anchor coordinates, and estimated trajectories using `matplotlib`.
 - Supports step-by-step frame advancement via keyboard input.
 
 ### Empirical Calibration Script (`fit_path_loss.py`)
-
-Run regression analysis on new BLE dataset logs:
+Runs Ordinary Least Squares (OLS) regression analysis on empirical BLE RSSI datasets:
 ```bash
 python fit_path_loss.py --data-dir data --alpha 0.2 --plot-out path_loss_fit.png
 ```
 
-### Automated Unit & Metric Tests
-
-- `ParticleFilterMetric.kt`: Replays recorded JSON telemetry against ground-truth trajectories and calculates mean positioning error in meters.
-- `PathFindTest.kt`: Unit tests verifying Dijkstra route finding accuracy.
+### Automated Unit & Metric Test Suites
+- `ParticleFilterMetric.kt`: Replays recorded JSON telemetry datasets (`BLE_Telemetry_*.json`) against ground-truth trajectories to calculate mean positioning error in meters.
+- `ConfigurationParserTest.kt`: Unit test suite verifying graph node/edge parsing, anchor text parsing, duplicate MAC detection, and malformed edge error handling.
+- `RouteInstructionGeneratorTest.kt`: Unit tests verifying turn angle calculation consistency (right turn, left turn, straight, stairs elevation changes) and continuous step merging.
+- `PathFindTest.kt`: Unit tests verifying Dijkstra shortest path route optimization across topological networks.
 
 ---
 
@@ -310,24 +350,35 @@ IndoorNavigation/
 │   ├── java/me/chetan/indoornavigation/
 │   │   ├── MainActivity.kt               # Entry Activity & BLE/Sensor Permissions
 │   │   ├── MathUtils.kt                  # Vector Interpolation & Distance Math
-│   │   ├── ParticleFilter.kt             # Sequential Monte Carlo Particle Filter
+│   │   ├── ParticleFilter.kt             # Sequential Monte Carlo Particle Filter (Deferred Seeding)
 │   │   ├── PathFind.kt                   # Topological Graph & Dijkstra Pathfinding
 │   │   ├── RSSIDistancePredictor.kt      # EMA Filter & Path Loss Distance Predictor
 │   │   ├── RouteInstructionGenerator.kt  # Turn Angle Vector Engine & Step Merger
 │   │   ├── data/
+│   │   │   ├── ConfigurationParser.kt    # Text Parser for Graph Nodes/Edges & BLE Anchors
+│   │   │   ├── DeviceScanInfo.kt         # Scanned BLE Beacon State Container
+│   │   │   ├── FilterEstimate.kt         # Estimated Coordinate Data Class
 │   │   │   ├── GeoLocation.kt            # 3D Coordinate & Hashable Node Data Class
-│   │   │   ├── NavigationData.kt         # Anchor Map & Topological Graph (NAV_GRAPH)
+│   │   │   ├── Measurement.kt            # Particle Filter Measurement Likelihood Data Class
+│   │   │   ├── NavigationData.kt         # Fallback Maps & Default Configuration Presets
 │   │   │   ├── Particle.kt               # State Hypothesis Data Class
 │   │   │   └── RouteStep.kt              # Instruction Step Enums & Data Class
 │   │   └── ui/
-│   │       ├── MainScreen.kt             # Compose Layout & Search Bar
-│   │       ├── MainViewModel.kt          # ViewModel, Sensor & BLE Scan Handlers
+│   │       ├── MainScreen.kt             # Compose Main Layout, Search Bar & Status Card
+│   │       ├── MainViewModel.kt          # ViewModel, BLE/Sensor Scanning & Prefs Management
+│   │       ├── SettingsScreen.kt         # Runtime Graph & BLE Anchor Configuration UI
 │   │       └── components/
 │   │           ├── BLEContainer.kt       # Scanned BLE Devices UI List
 │   │           ├── DebugContainer.kt     # Real-Time Telemetry Stats & Diagnostics
-│   │           ├── RouteDisplay.kt       # Turn-by-Turn Timeline UI
-│   │           └── RouteGraph.kt         # Canvas Topology & Route Painter
+│   │           ├── RouteDisplay.kt       # Turn-by-Turn Timeline Guidance UI
+│   │           └── RouteGraph3D.kt       # Interactive 3D Spatial Canvas Visualizer
 │   └── assets/                           # Asset Telemetry Traces
+├── app/src/test/java/me/chetan/indoornavigation/
+│   ├── ConfigurationParserTest.kt        # Unit Tests for Configuration Parser
+│   ├── ExampleUnitTest.kt                # Sample Unit Test
+│   ├── ParticleFilterMetric.kt           # Ground-Truth Replay Telemetry Error Evaluation
+│   ├── PathFindTest.kt                   # Unit Tests for Dijkstra Route Search
+│   └── RouteInstructionGeneratorTest.kt  # Unit Tests for Turn Angle & Instruction Engine
 ├── data/                                 # Empirical Distance Test Datasets (.txt)
 ├── fit_path_loss.py                      # Path Loss Regression & Calibration Script
 ├── particle_filter.py                    # Python Telemetry Replay & Simulation Tool
