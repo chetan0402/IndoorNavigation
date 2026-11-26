@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -80,9 +81,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
     private var stepSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
     init {
-        val bluetoothManager = application.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        scanner = bluetoothManager.adapter?.bluetoothLeScanner
-        
         isStepSensorAvailable.value = (stepSensor != null)
 
         loadConfigurationFromPrefs()
@@ -242,29 +240,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     currentTime - info.lastSeen > SCAN_TIMEOUT_MS
                 }.keys
                 toRemove.forEach { devices.remove(it) }
+
+                // Watchdog: If scanning is active but no BLE updates received for 2s, restart BLE scanner
+                if (scanCallback != null && (currentTime - lastBleUpdateTimestamp.longValue > 2_000L) && lastBleUpdateTimestamp.longValue > 0L) {
+                    Log.w("BLE", "No BLE scan results received for 2s. Restarting BLE scan...")
+                    stopBleScan()
+                    startBleScan()
+                }
             }
         }
     }
 
-    @SuppressLint("MissingPermission")
-    fun startBleScan() {
-        if (scanCallback != null) return
+    private fun processScanResults(results: List<ScanResult>) {
+        viewModelScope.launch {
+            val currentTime = System.currentTimeMillis()
+            var hasRelevantResult = false
+            val activeAnchors = anchors.value
 
-        Log.d("BLE", "Starting BLE scan")
-        scanCallback = object : ScanCallback() {
-            override fun onScanResult(callbackType: Int, result: ScanResult) {
-                super.onScanResult(callbackType, result)
-                val address = result.device.address
-                val activeAnchors = anchors.value
-                if (address !in activeAnchors) return
-                
+            for (result in results) {
+                val address = result.device?.address?.uppercase() ?: continue
+                if (address !in activeAnchors) continue
+
+                hasRelevantResult = true
                 val currentInfo = devices[address]
                 val predictor = currentInfo?.predictor ?: RSSIDistancePredictor()
                 val dis = predictor.predict(result.rssi.toDouble())
-                
-                devices[address] = DeviceScanInfo(dis, predictor, System.currentTimeMillis())
-                
-                // Buffer measurement for batch update
+
+                devices[address] = DeviceScanInfo(dis, predictor, currentTime)
+
                 val anchor = activeAnchors[address]!!
                 measurementBuffer[address] = Measurement(
                     x = anchor.long,
@@ -273,60 +276,110 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
                     radius = dis,
                     variance = 5.0
                 )
-
-                val currentTime = System.currentTimeMillis()
-                if (currentTime - lastUpdateTimestamp > updateIntervalMs) {
-                    val activeBleDevices = devices.filter { (addr, info) ->
-                        addr in activeAnchors && currentTime - info.lastSeen <= SCAN_TIMEOUT_MS
-                    }
-
-                    if (!particleFilter.isInitialized) {
-                        if (activeBleDevices.size >= 2) {
-                            val anchorList = mutableListOf<GeoLocation>()
-                            val distanceList = mutableListOf<Double>()
-                            for ((addr, info) in activeBleDevices) {
-                                val anchorGeo = activeAnchors[addr]
-                                if (anchorGeo != null) {
-                                    anchorList.add(anchorGeo)
-                                    distanceList.add(info.distance)
-                                }
-                            }
-                            if (anchorList.size >= 2) {
-                                val pathFind = PathFind(navGraph.value.mapValues { it.value.toMutableList() })
-                                val initialLocation = pathFind.trilaterate(anchorList, distanceList)
-                                particleFilter.absUpdate(initialLocation.long, initialLocation.lat, initialLocation.alt)
-                                isLocationInitialized.value = true
-                                Log.d("ParticleFilter", "Initialized via trilateration from ${anchorList.size} BLE signals: $initialLocation")
-                            }
-                        }
-                    }
-
-                    if (particleFilter.isInitialized) {
-                        val closestMeasurements = measurementBuffer.values.sortedBy { it.radius }.take(2)
-                        if (closestMeasurements.isNotEmpty()) {
-                            particleFilter.update(closestMeasurements)
-                        }
-                    }
-
-                    measurementBuffer.clear()
-                    lastUpdateTimestamp = currentTime
-                    bleUpdateCount.intValue++
-                    lastBleUpdateTimestamp.longValue = currentTime
-                    userLocation.value = particleFilter.estimate(activeAnchors)
-                    particleFilterDebugInfo.value = particleFilter.getDebugInfo()
-                }
             }
-            override fun onScanFailed(errorCode: Int) {
-                Log.e("BLE", "Scan failed with error: $errorCode")
+
+            if (!hasRelevantResult) return@launch
+
+            if (currentTime - lastUpdateTimestamp > updateIntervalMs) {
+                val activeBleDevices = devices.filter { (addr, info) ->
+                    addr in activeAnchors && currentTime - info.lastSeen <= SCAN_TIMEOUT_MS
+                }
+
+                if (!particleFilter.isInitialized) {
+                    if (activeBleDevices.size >= 2) {
+                        val anchorList = mutableListOf<GeoLocation>()
+                        val distanceList = mutableListOf<Double>()
+                        for ((addr, info) in activeBleDevices) {
+                            val anchorGeo = activeAnchors[addr]
+                            if (anchorGeo != null) {
+                                anchorList.add(anchorGeo)
+                                distanceList.add(info.distance)
+                            }
+                        }
+                        if (anchorList.size >= 2) {
+                            val pathFind = PathFind(navGraph.value.mapValues { it.value.toMutableList() })
+                            val initialLocation = pathFind.trilaterate(anchorList, distanceList)
+                            particleFilter.absUpdate(initialLocation.long, initialLocation.lat, initialLocation.alt)
+                            isLocationInitialized.value = true
+                            Log.d("ParticleFilter", "Initialized via trilateration from ${anchorList.size} BLE signals: $initialLocation")
+                        }
+                    }
+                }
+
+                if (particleFilter.isInitialized) {
+                    val closestMeasurements = measurementBuffer.values.sortedBy { it.radius }.take(2)
+                    if (closestMeasurements.isNotEmpty()) {
+                        particleFilter.update(closestMeasurements)
+                    }
+                }
+
+                measurementBuffer.clear()
+                lastUpdateTimestamp = currentTime
+                bleUpdateCount.intValue++
+                lastBleUpdateTimestamp.longValue = currentTime
+                userLocation.value = particleFilter.estimate(activeAnchors)
+                particleFilterDebugInfo.value = particleFilter.getDebugInfo()
             }
         }
-        scanner?.startScan(scanCallback)
+    }
+
+    @SuppressLint("MissingPermission")
+    fun startBleScan() {
+        if (scanCallback != null) return
+
+        val bluetoothManager = getApplication<Application>().getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val leScanner = bluetoothManager.adapter?.bluetoothLeScanner
+        if (leScanner == null) {
+            Log.e("BLE", "BluetoothLeScanner is unavailable (Bluetooth adapter disabled or null)")
+            return
+        }
+        scanner = leScanner
+
+        Log.d("BLE", "Starting BLE scan")
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                super.onScanResult(callbackType, result)
+                processScanResults(listOf(result))
+            }
+
+            override fun onBatchScanResults(results: MutableList<ScanResult>) {
+                super.onBatchScanResults(results)
+                processScanResults(results)
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                Log.e("BLE", "Scan failed with error: $errorCode")
+                viewModelScope.launch {
+                    stopBleScan()
+                }
+            }
+        }
+
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setReportDelay(0)
+            .build()
+
+        try {
+            leScanner.startScan(null, settings, callback)
+            scanCallback = callback
+            lastBleUpdateTimestamp.longValue = System.currentTimeMillis()
+        } catch (e: Exception) {
+            Log.e("BLE", "Exception starting BLE scan", e)
+            scanCallback = null
+        }
     }
 
     @SuppressLint("MissingPermission")
     fun stopBleScan() {
         Log.d("BLE", "Stopping BLE scan")
-        scanCallback?.let { scanner?.stopScan(it) }
+        scanCallback?.let { callback ->
+            try {
+                scanner?.stopScan(callback)
+            } catch (e: Exception) {
+                Log.e("BLE", "Exception stopping BLE scan", e)
+            }
+        }
         scanCallback = null
     }
 
@@ -335,3 +388,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application), S
         sensorManager.unregisterListener(this)
     }
 }
+
